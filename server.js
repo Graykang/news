@@ -77,6 +77,15 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 200, { ok: true }, { 'set-cookie': auth.logoutCookie(req) });
   }
 
+  // 로그인 화면 배경 사진(이 두 파일만 로그인 전에도 공개, 하루 캐시)
+  if (url.pathname === '/img/login-bg.jpg' || url.pathname === '/img/login-bg-m.jpg') {
+    return fs.readFile(path.join(PUBLIC_DIR, url.pathname), (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Not found'); }
+      res.writeHead(200, { 'content-type': 'image/jpeg', 'cache-control': 'public, max-age=86400' });
+      res.end(data);
+    });
+  }
+
   // ── 이하 모두 로그인 필요 (화면 파일과 API 모두) ──
   const user = auth.currentUser(req);
   if (!user) {

@@ -228,6 +228,14 @@ async function handle(request, env, ctx) {
     return json(200, { ok: true }, { 'set-cookie': sessionCookie('', 0) });
   }
 
+  // 로그인 화면 배경 사진(이 두 파일만 로그인 전에도 공개, 하루 캐시)
+  if (path === '/img/login-bg.jpg' || path === '/img/login-bg-m.jpg') {
+    const asset = await env.ASSETS.fetch(request);
+    const out = new Response(asset.body, asset);
+    out.headers.set('cache-control', 'public, max-age=86400');
+    return out;
+  }
+
   // ── 이하 로그인 필요 ──
   const user = await currentUser(request, env);
   if (!user) {
