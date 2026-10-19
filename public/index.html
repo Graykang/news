@@ -12,8 +12,8 @@
   // 하루 첫 접속 때만 시작 화면을 켬(깜빡임 없이 바로 덮기 위해 가장 먼저 판단). 각자 '내 설정'에서 끌 수 있음
   try {
     var d = new Date(), k = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
-    var off = localStorage.getItem('splashOff') === '1', just = sessionStorage.getItem('justLoggedIn') === '1';
-    if (!matchMedia('(prefers-reduced-motion: reduce)').matches && !off && (just || localStorage.getItem('splashDay') !== k)) {
+    var off = localStorage.getItem('splashOff') === '1';
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches && !off && localStorage.getItem('splashDay') !== k) {
       document.documentElement.classList.add('splash-on');
       ['GmarketSansBold', 'BMDOHYEON'].forEach(function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'font'; l.type = 'font/woff'; l.crossOrigin = 'anonymous'; l.href = '/fonts/' + n + '.woff'; document.head.appendChild(l); });
     }

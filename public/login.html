@@ -74,7 +74,8 @@
       const r = await fetch('/login', { method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ username: f.username.value, password: f.password.value, remember: document.getElementById('k').checked }) });
       const j = await r.json().catch(() => ({}));
-      if (r.ok) { try { sessionStorage.setItem('justLoggedIn', '1'); } catch {} location.replace('/'); return; }
+      // 직접 로그인하면 오늘은 시작 화면 없이 바로 입장
+      if (r.ok) { try { var d = new Date(); localStorage.setItem('splashDay', d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate()); } catch {} location.replace('/'); return; }
       e.textContent = j.error || '로그인에 실패했습니다.';
     } catch { e.textContent = '서버에 연결할 수 없습니다.'; }
     b.disabled = false; f.password.select();

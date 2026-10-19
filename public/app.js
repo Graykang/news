@@ -363,7 +363,6 @@
     try {
       const d = new Date();
       localStorage.setItem('splashDay', `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`);
-      sessionStorage.removeItem('justLoggedIn');
     } catch {}
   }
   function fillSplash(j) {
