@@ -9,6 +9,7 @@
     "binding": "ASSETS",
     "run_worker_first": true
   },
+  "triggers": { "crons": ["*/15 * * * *"] },
   "kv_namespaces": [
     { "binding": "NEWS", "id": "a0b1384a78da4d17acf2605a7465fd93" }
   ]

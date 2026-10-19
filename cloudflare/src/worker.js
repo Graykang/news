@@ -423,4 +423,14 @@ export default {
     try { return secure(await handle(request, env, ctx)); }
     catch (e) { return secure(json(500, { error: '서버 오류' })); }
   },
+  // 15분마다 GitHub Actions 수집을 직접 깨움. GitHub 자체 예약 실행은 30~60분씩 밀리는 일이 잦아서 보조가 아닌 주 실행 수단으로 사용.
+  // 시크릿 GH_TOKEN(이 저장소 Actions 쓰기 권한만 있는 토큰)이 없으면 아무것도 하지 않음.
+  async scheduled(event, env, ctx) {
+    if (!env.GH_TOKEN) return;
+    ctx.waitUntil(fetch('https://api.github.com/repos/Graykang/news/actions/workflows/collect.yml/dispatches', {
+      method: 'POST',
+      headers: { authorization: 'Bearer ' + env.GH_TOKEN, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'kangs-news-cron', 'content-type': 'application/json' },
+      body: JSON.stringify({ ref: 'main' }),
+    }).then((r) => { if (r.status !== 204) console.log('수집 호출 실패', r.status); }).catch((e) => console.log('수집 호출 오류', String(e))));
+  },
 };
