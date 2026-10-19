@@ -6,16 +6,17 @@
   };
 
   const PAGE = 40;
-  const NOISY = new Set(['opinion', 'sports', 'entertainment', 'weather', 'fortune']); // 주요 이슈에서 제외
   const TABS = [
-    { id: 'issue', name: '주요 이슈', desc: '여러 매체가 동시에 다룬, 지금 가장 크게 보도되는 소식 (최근 24시간)' },
     { id: 'economy', name: '경제', desc: '' },
-    { id: 'politics', name: '정치', desc: '' },
-    { id: 'society', name: '사회', desc: '' },
-    { id: 'world', name: '세계', desc: '' },
+    { id: 'finance', name: '금융', desc: '은행·금리·대출·보험·가상자산 등 (경제의 하위 분류, 제목 키워드와 금융 피드로 분류)' },
+    { id: 'corporate', name: '기업', desc: '기업 소식·실적·인수합병 등 (경제의 하위 분류, 제목 키워드와 산업 피드로 분류)' },
+    { id: 'securities', name: '증권', desc: '증시·주가·종목·상장 등 (경제의 하위 분류, 제목 키워드와 증권 피드로 분류)' },
     { id: 'realestate', name: '부동산', desc: '부동산 전용 피드와 제목 키워드(아파트·전세·청약 등)로 모은 기사' },
     { id: 'education', name: '교육', desc: '교육 피드와 제목 키워드(수능·입시·교육부 등)로 모은 기사' },
     { id: 'tech', name: 'IT과학', desc: 'IT·과학 피드와 제목 키워드(AI·반도체·우주 등)로 모은 기사' },
+    { id: 'politics', name: '정치', desc: '' },
+    { id: 'society', name: '사회', desc: '' },
+    { id: 'world', name: '세계', desc: '' },
     { id: 'culture', name: '생활문화', desc: '' },
     { id: 'entertainment', name: '연예', desc: '' },
     { id: 'sports', name: '스포츠', desc: '' },
@@ -109,7 +110,6 @@
       if (!outs.some(o => !off.has(o))) return false;
       if (q && !(c.title + ' ' + c.summary + ' ' + c.others.map(o => o.title).join(' ')).toLowerCase().includes(q)) return false;
       switch (tab) {
-        case 'issue': return c.count >= 3 && now - c.ts < 24 * 36e5 && !NOISY.has(c.cat);
         case 'mine': return kwMatch(c).length > 0;
         case 'policy': return c.policy;
         case 'all': return true;
@@ -117,8 +117,18 @@
         default: return c.cats.includes(tab);
       }
     });
-    if (tab === 'issue') list = list.sort((a, b) => b.count - a.count || b.ts - a.ts);
-    return list;
+    return list.map(adjustForOutlets);
+  }
+  // 신문사를 골라서 볼 때, 묶음의 대표 기사가 꺼 둔 신문사 것이면 켜 둔 신문사의 기사로 바꿔서 보여 줌
+  function adjustForOutlets(c) {
+    if (!off.has(c.outlet)) return c;
+    const i = c.others.findIndex(o => !off.has(o.outlet));
+    if (i < 0) return c;
+    const o = c.others[i];
+    return {
+      ...c, outlet: o.outlet, title: o.title, link: o.link, summary: '', author: '', // 요약·기자는 대표 기사 것이라 비움
+      others: [{ outlet: c.outlet, title: c.title, link: c.link }, ...c.others.filter((_, j) => j !== i)],
+    };
   }
   function counts() {
     const out = {};
@@ -129,7 +139,6 @@
       for (const k of c.cats) if (out[k] != null) out[k]++;
       if (c.policy) out.policy++;
       if (c.cat === 'opinion' && c.editorial) out.opinion_ed = (out.opinion_ed || 0) + 1;
-      if (c.count >= 3 && now - c.ts < 24 * 36e5 && !NOISY.has(c.cat)) out.issue++;
       if (kw.include.length && kwMatch(c).length) out.mine++;
     }
     return out;
@@ -142,7 +151,7 @@
     const cls = ['card', c.image ? 'has-img' : '', read.has(c.id) ? 'read' : ''].join(' ');
     const catName = (data.categories.find(k => k.id === c.cat) || {}).name || '';
     const others = c.others.length
-      ? `<details class="others"><summary>${tab === 'issue' ? '<span class="hot">●</span> ' : ''}<b>${c.count}개 매체</b>가 함께 보도 ▾</summary><ul>${
+      ? `<details class="others"><summary><b>${c.count}개 매체</b>가 함께 보도 ▾</summary><ul>${
           c.others.map(x => `<li><span class="o">${esc(data.outlets[x.outlet].name)}</span><a href="${esc(safeUrl(x.link))}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a></li>`).join('')
         }</ul></details>` : '';
     const img = c.image
@@ -173,7 +182,8 @@
   }
   function renderOutlets() {
     $('#outlets').innerHTML = Object.entries(data.outlets).map(([k, o]) =>
-      `<button class="chip" data-o="${k}" style="--c:${o.color}" aria-pressed="${!off.has(k)}"><i></i>${esc(o.name)}</button>`).join('');
+      `<button class="chip" data-o="${k}" style="--c:${o.color}" aria-pressed="${!off.has(k)}"><i></i>${esc(o.name)}</button>`).join('') +
+      '<button class="chip ghost" data-all="off">전체 해제</button><button class="chip ghost" data-all="on">전체 선택</button>';
   }
   function renderFeed() {
     const list = visible();
@@ -192,7 +202,7 @@
     let html = '', lastDay = '';
     const slice = list.slice(0, shown);
     for (const c of slice) {
-      if (tab !== 'issue') {
+      {
         const dk = dayKey(c.ts);
         if (dk !== lastDay) { html += `<div class="day">${dayLabel(c.ts)}</div>`; lastDay = dk; }
       }
@@ -201,7 +211,7 @@
     $('#feed').innerHTML = html;
     $('#more').hidden = list.length <= shown;
     $('#empty').hidden = list.length > 0;
-    if (!list.length) $('#empty').textContent = query ? '검색 결과가 없습니다.' : tab === 'mine' ? (kw.include.length ? '키워드에 해당하는 최근 기사가 없습니다.' : '위에서 키워드를 추가해 보세요. 예: 금리, 삼성전자, 부동산') : '표시할 기사가 없습니다.';
+    if (!list.length) $('#empty').textContent = off.size >= Object.keys(data.outlets).length ? '보고 싶은 신문사를 위에서 선택해 주세요.' : query ? '검색 결과가 없습니다.' : tab === 'mine' ? (kw.include.length ? '키워드에 해당하는 최근 기사가 없습니다.' : '위에서 키워드를 추가해 보세요. 예: 금리, 삼성전자, 부동산') : '표시할 기사가 없습니다.';
   }
   function renderMeta() {
     $('#whoname').textContent = me;
@@ -232,7 +242,7 @@
         } else { applyPending(); }
       }
     } catch (e) {
-      if (!data) $('#empty').hidden = false, $('#empty').textContent = '서버에 연결할 수 없습니다. 서버가 켜져 있는지 확인해 주세요.';
+      if (!data) { $('#empty').hidden = false; $('#empty').textContent = '연결이 불안정합니다. 잠시 후 다시 시도합니다…'; setTimeout(() => load(first), 3000); }
     } finally { btn.classList.remove('spin'); }
   }
   function applyPending() {
@@ -250,8 +260,8 @@
   });
   $('#outlets').addEventListener('click', (e) => {
     const b = e.target.closest('.chip'); if (!b) return;
-    const k = b.dataset.o;
-    off.has(k) ? off.delete(k) : off.add(k);
+    if (b.dataset.all) off = b.dataset.all === 'off' ? new Set(Object.keys(data.outlets)) : new Set();
+    else { const k = b.dataset.o; off.has(k) ? off.delete(k) : off.add(k); }
     store.set('offOutlets', [...off]); shown = PAGE;
     renderOutlets(); renderFeed();
   });
@@ -299,6 +309,33 @@
     saveKw(); renderKw(); renderTabs(); shown = PAGE; renderFeed();
   });
 
+  // ── 상단 시세 자막 ──
+  let tkSig = '';
+  const tkT0 = performance.now();
+  function renderTicker(d) {
+    const html = d.items.map(i => {
+      const arrow = i.dir === 'up' ? '▲' : i.dir === 'down' ? '▼' : '';
+      const chg = i.dir === 'flat' ? '보합' : `${arrow} ${esc(i.change.replace(/^[+-]/, ''))} (${esc(i.pct.replace(/^[+-]/, ''))}%)`;
+      const state = i.status === 'OPEN' ? '장중' : i.status === 'CLOSE' ? '장마감' : '';
+      const when = i.at ? new Date(i.at).toLocaleString('ko-KR') : '';
+      return `<span class="tk" title="${esc((state + ' ' + when).trim())}"><b>${esc(i.label)}</b><span class="tv">${esc(i.price)}</span><span class="tc ${i.dir}">${chg}</span></span>`;
+    }).join('');
+    if (html === tkSig) return;
+    tkSig = html;
+    const track = $('#tickerTrack');
+    track.innerHTML = html + html; // 두 번 이어 붙여 끊김 없이 반복
+    const dur = Math.max(25, track.scrollWidth / 2 / 55); // 초당 약 55px
+    track.style.animationDuration = dur + 's';
+    track.style.animationDelay = -(((performance.now() - tkT0) / 1000) % dur) + 's'; // 갱신해도 위치를 이어서
+    $('#ticker').hidden = false;
+  }
+  async function loadTicker() {
+    try {
+      const r = await fetch('/api/ticker', { cache: 'no-store' });
+      if (r.ok) renderTicker(await r.json());
+    } catch {}
+  }
+
   // 테마
   const root = document.documentElement;
   const savedTheme = store.get('theme', null);
@@ -322,5 +359,6 @@
     kw = { include: j.include || [], exclude: j.exclude || [] };
     if (data) { renderTabs(); renderFeed(); }
   }).catch(() => {});
+  loadTicker(); setInterval(loadTicker, 60000);
   load(true);
 })();

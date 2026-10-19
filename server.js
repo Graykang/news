@@ -9,6 +9,8 @@ const path = require('path');
 const auth = require('./auth');
 const audit = require('./audit');
 const collect = require('./lib/collect');
+const ticker = require('./lib/ticker');
+let tk = { at: 0, data: null }; // 시세 자막 1분 캐시
 const { OUTLETS, CATEGORIES, refresh, REFRESH_MS } = collect;
 
 const PORT = process.env.PORT || 3100;
@@ -109,6 +111,14 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, all[user]);
     }
     return sendJson(res, 405, { error: 'method not allowed' });
+  }
+
+  // ── 시세 자막 (1분 캐시) ──
+  if (url.pathname === '/api/ticker') {
+    if (Date.now() - tk.at > 60000) {
+      try { tk = { at: Date.now(), data: await ticker.fetchTicker((tk.data && tk.data.items) || []) }; } catch { tk.at = Date.now() - 50000; }
+    }
+    return tk.data ? sendJson(res, 200, tk.data) : sendJson(res, 503, { error: '시세를 가져오지 못했습니다' });
   }
 
   // ── 관리자 전용 ──

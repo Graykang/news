@@ -53,4 +53,11 @@ const MIN_OK_FEEDS = 0.6; // 정상 수집된 피드가 이 비율 미만이면 
     process.exit(1);
   }
   console.log('Cloudflare KV 업로드 완료');
+  try { // 시세 자막 백업: Worker가 직접 조회하지 못할 때 쓰는 마지막 값
+    const tk = await require('./lib/ticker').fetchTicker();
+    const r2 = await fetch(url.replace('/values/snapshot', '/values/ticker'), {
+      method: 'PUT', headers: { authorization: `Bearer ${CF_API_TOKEN}`, 'content-type': 'text/plain' }, body: JSON.stringify(tk),
+    });
+    console.log(r2.ok ? '시세 백업 업로드 완료' : '시세 백업 업로드 실패 ' + r2.status);
+  } catch (e) { console.log('시세 백업 건너뜀:', e.message); }
 })().catch((e) => { console.error(e); process.exit(1); });

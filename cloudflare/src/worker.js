@@ -10,6 +10,8 @@
 //   KV 키 audit     접속 기록 (관리자 화면에서 조회)
 //   KV 키 accounts  웹에서 추가한 계정 (관리자 화면에서 추가/삭제)
 
+import { fetchTicker } from '../../lib/ticker.js';
+
 const COOKIE = 'nm_session';
 const SESSION_MS = 30 * 24 * 3600 * 1000;
 const MAX_FAILS = 5;
@@ -259,6 +261,20 @@ async function handle(request, env, ctx) {
       return json(200, val);
     }
     return json(405, { error: 'method not allowed' });
+  }
+
+  // ── 시세 자막 (네이버 시세를 1분 캐시로 조회, 실패 시 수집기가 저장해 둔 값 사용) ──
+  if (path === '/api/ticker') {
+    const cache = caches.default;
+    const key = new Request('https://ticker.internal/v1');
+    const hit = await cache.match(key);
+    if (hit) return json(200, await hit.json());
+    const fallback = await env.NEWS.get('ticker', 'json').catch(() => null);
+    let data;
+    try { data = await fetchTicker((fallback && fallback.items) || []); } catch { data = fallback; }
+    if (!data) return json(503, { error: '시세를 가져오지 못했습니다' });
+    ctx.waitUntil(cache.put(key, new Response(JSON.stringify(data), { headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=60' } })));
+    return json(200, data);
   }
 
   // ── 관리자 전용 ──

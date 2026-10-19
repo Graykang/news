@@ -138,3 +138,24 @@ a.who { display: inline-flex; align-items: center; }
 mark { background: color-mix(in srgb, #facc15 45%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
 .tag.kw { background: color-mix(in srgb, #facc15 28%, transparent); color: #a16207; }
 :root[data-theme="dark"] .tag.kw { color: #facc15; }
+
+/* 신문사 전체 해제/선택 */
+.chip.ghost { border-style: dashed; color: var(--ink3); padding: 3px 11px; }
+.chip.ghost:hover { color: var(--accent); border-color: var(--accent); }
+
+/* 상단 시세 자막 */
+.ticker { overflow: hidden; height: 32px; display: flex; align-items: center; background: var(--card); border-bottom: 1px solid var(--line); }
+.ticker[hidden] { display: none; }
+.ticker-track { display: flex; width: max-content; white-space: nowrap; animation: tkscroll 60s linear infinite; will-change: transform; }
+.ticker:hover .ticker-track { animation-play-state: paused; }
+@keyframes tkscroll { to { transform: translateX(-50%); } }
+.tk { display: inline-flex; align-items: baseline; gap: 7px; padding: 0 20px; font-size: 12.5px; }
+.tk b { color: var(--ink2); font-weight: 700; }
+.tv { font-variant-numeric: tabular-nums; font-weight: 600; }
+.tc { font-variant-numeric: tabular-nums; font-size: 12px; }
+.tc.up { color: #e11d48; } .tc.down { color: #2563eb; } .tc.flat { color: var(--ink3); }
+:root[data-theme="dark"] .tc.up { color: #fb7185; } :root[data-theme="dark"] .tc.down { color: #60a5fa; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tc.up { color: #fb7185; } :root:not([data-theme="light"]) .tc.down { color: #60a5fa; } }
+@media (prefers-reduced-motion: reduce) { .ticker { overflow-x: auto; } .ticker-track { animation: none; } }
+
+.more[hidden] { display: none; }
