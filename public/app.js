@@ -349,7 +349,7 @@
   }
 
   // ── 시작 화면(하루 첫 접속 때 한 번) · 내 설정 ──
-  let profile = { welcome: '', motto: '' };
+  let profile = { welcome: '' };
   const splashEl = $('#splash');
   const splashOn = document.documentElement.classList.contains('splash-on'); // 오늘 아직 안 봤을 때만 켜짐(head의 짧은 스크립트가 판단)
   let splashDone = false;
@@ -369,18 +369,19 @@
     } catch {}
   }
   function fillSplash(j) {
-    profile = { welcome: j.welcome || '', motto: j.motto || '' };
+    profile = { welcome: j.welcome || '' };
     if (!splashOn) return;
-    let manual = false;
-    try { manual = sessionStorage.getItem('justLoggedIn') === '1'; } catch {}
     $('#spHello').textContent = `${j.user}님, ${greeting()}`;
     $('#spMsg').textContent = profile.welcome;
-    $('#spMotto').textContent = profile.motto ? `“${profile.motto}”` : '';
-    $('#spAuto').textContent = manual ? '로그인되었습니다' : '자동 로그인되었습니다';
+    try {
+      const q = window.kangsQuoteOfDay();
+      $('#spQuote').textContent = `“${q.text}”`;
+      $('#spWho').textContent = `— ${q.who}${q.book ? `, 『${q.book}』` : ''}`;
+    } catch {}
     splashEl.classList.add('sp-ready');
   }
   if (splashOn) {
-    // 자동으로 사라지지 않고, 확인 버튼(또는 Enter/Esc)을 눌러야 넘어감. 그 사이 뒤에서 기사 목록을 미리 불러옴
+    // 자동으로 사라지지 않고, 입장 버튼(또는 Enter/Esc)을 눌러야 넘어감. 그 사이 뒤에서 기사 목록을 미리 불러옴
     $('#spOk').addEventListener('click', endSplash);
     document.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'Escape') endSplash(); });
     setTimeout(() => $('#spOk').focus(), 60);
@@ -391,22 +392,15 @@
     let off = false;
     try { off = localStorage.getItem('splashOff') === '1'; } catch {}
     $('#pfSplash').checked = !off;
-    $('#pfMotto').value = profile.motto || '';
     $('#pfWelcome').textContent = profile.welcome ? `관리자가 남긴 메시지: ${profile.welcome}` : '';
     $('#pfMsg').textContent = '';
     dlg.showModal();
   });
   $('#pfClose').addEventListener('click', () => dlg.close());
-  $('#pfSave').addEventListener('click', async () => {
+  $('#pfSave').addEventListener('click', () => {
     try { localStorage.setItem('splashOff', $('#pfSplash').checked ? '0' : '1'); } catch {}
-    try {
-      const r = await fetch('/api/me/profile', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ motto: $('#pfMotto').value }) });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.error || '저장하지 못했습니다.');
-      profile.motto = j.motto || '';
-      $('#pfMsg').textContent = '저장했습니다.';
-      setTimeout(() => dlg.close(), 700);
-    } catch (e) { $('#pfMsg').textContent = e.message; }
+    $('#pfMsg').textContent = '저장했습니다.';
+    setTimeout(() => dlg.close(), 600);
   });
 
   // 테마

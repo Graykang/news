@@ -273,23 +273,7 @@ async function handle(request, env, ctx) {
     const hdr = {};
     if (t && t.rm && t.exp - Date.now() < SESSION_MS - 24 * 3600 * 1000) hdr['set-cookie'] = sessionCookie(await makeToken(env, user, true), SESSION_MS / 1000);
     const prof = (await env.NEWS.get('prof:' + user, 'json').catch(() => null)) || {};
-    return json(200, { user, admin, welcome: prof.welcome || '', motto: prof.motto || '' }, hdr);
-  }
-
-  // ── 내 프로필: 시작 화면에 보일 나만의 문구(좌우명·슬로건). 환영 메시지는 관리자가 계정 관리에서 입력 ──
-  if (path === '/api/me/profile' && request.method === 'PUT') {
-    if (!sameOrigin(request)) return json(403, { error: '허용되지 않은 요청입니다.' });
-    let body;
-    try {
-      const raw = await request.text();
-      if (raw.length > 2048) throw new Error('large');
-      body = JSON.parse(raw);
-    } catch { return json(400, { error: '잘못된 요청입니다.' }); }
-    const motto = cleanText(body.motto, 60);
-    const prof = (await env.NEWS.get('prof:' + user, 'json')) || {};
-    if (motto) prof.motto = motto; else delete prof.motto;
-    await env.NEWS.put('prof:' + user, JSON.stringify(prof));
-    return json(200, { ok: true, motto });
+    return json(200, { user, admin, welcome: prof.welcome || '' }, hdr);
   }
 
   // ── 내 키워드 (계정별 저장: KV 키 kw:<아이디>) ──
