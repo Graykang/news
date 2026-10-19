@@ -6,13 +6,21 @@
   };
 
   const PAGE = 40;
+  const NOISY = new Set(['opinion', 'sports', 'entertainment', 'weather', 'fortune']); // 주요 이슈에서 제외
   const TABS = [
     { id: 'issue', name: '주요 이슈', desc: '여러 매체가 동시에 다룬, 지금 가장 크게 보도되는 소식 (최근 24시간)' },
     { id: 'economy', name: '경제', desc: '' },
     { id: 'politics', name: '정치', desc: '' },
     { id: 'society', name: '사회', desc: '' },
-    { id: 'world', name: '국제', desc: '' },
+    { id: 'world', name: '세계', desc: '' },
+    { id: 'realestate', name: '부동산', desc: '부동산 전용 피드와 제목 키워드(아파트·전세·청약 등)로 모은 기사' },
+    { id: 'education', name: '교육', desc: '교육 피드와 제목 키워드(수능·입시·교육부 등)로 모은 기사' },
+    { id: 'tech', name: 'IT과학', desc: 'IT·과학 피드와 제목 키워드(AI·반도체·우주 등)로 모은 기사' },
+    { id: 'culture', name: '생활문화', desc: '' },
+    { id: 'entertainment', name: '연예', desc: '' },
     { id: 'sports', name: '스포츠', desc: '' },
+    { id: 'weather', name: '날씨', desc: '날씨 예보와 기상 관련 기사 (제목 키워드로 분류)' },
+    { id: 'fortune', name: '운세', desc: '오늘의 운세·띠별 운세 (제목 키워드로 분류)' },
     { id: 'opinion', name: '사설·칼럼', desc: '신문사 사설과 오피니언' },
     { id: 'policy', name: '제도·정책', desc: '시행·개정·도입 등 앞으로 바뀌는 제도와 정책 관련 기사' },
     { id: 'mine', name: '★ 내 키워드', desc: '내가 등록한 키워드가 제목·요약에 들어 있는 기사만 모아 보여 줍니다. 키워드는 내 계정에만 저장되며 다른 가족에게는 보이지 않습니다.' },
@@ -101,7 +109,7 @@
       if (!outs.some(o => !off.has(o))) return false;
       if (q && !(c.title + ' ' + c.summary + ' ' + c.others.map(o => o.title).join(' ')).toLowerCase().includes(q)) return false;
       switch (tab) {
-        case 'issue': return c.count >= 3 && now - c.ts < 24 * 36e5 && c.cat !== 'opinion' && c.cat !== 'sports';
+        case 'issue': return c.count >= 3 && now - c.ts < 24 * 36e5 && !NOISY.has(c.cat);
         case 'mine': return kwMatch(c).length > 0;
         case 'policy': return c.policy;
         case 'all': return true;
@@ -121,7 +129,7 @@
       for (const k of c.cats) if (out[k] != null) out[k]++;
       if (c.policy) out.policy++;
       if (c.cat === 'opinion' && c.editorial) out.opinion_ed = (out.opinion_ed || 0) + 1;
-      if (c.count >= 3 && now - c.ts < 24 * 36e5 && c.cat !== 'opinion' && c.cat !== 'sports') out.issue++;
+      if (c.count >= 3 && now - c.ts < 24 * 36e5 && !NOISY.has(c.cat)) out.issue++;
       if (kw.include.length && kwMatch(c).length) out.mine++;
     }
     return out;
