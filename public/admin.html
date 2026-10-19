@@ -18,6 +18,8 @@
   th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: top; }
   th { font-size: 12px; color: var(--ink3); font-weight: 600; background: color-mix(in srgb, var(--line) 35%, transparent); }
   tr:last-child td { border-bottom: 0; }
+  .badge.warn { background: #fde8e8; color: #c0392b; }
+  @media (prefers-color-scheme: dark) { .badge.warn { background: #4a1f1f; color: #ff9a9a; } }
   .badge { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 5px; background: var(--accent-soft); color: var(--accent); margin-left: 6px; }
   .t-login { color: #15803d; } .t-visit { color: var(--ink2); } .t-fail { color: #b91c1c; font-weight: 700; }
   .sub { color: var(--ink3); font-size: 12px; }
@@ -106,6 +108,13 @@
     return h < 48 ? h + '시간 전' : Math.floor(h / 24) + '일 전';
   }
   let data = null, shown = 50;
+  // 의심 표시: 최근 7일 안에 서로 다른 통신사·지역(위치 정보가 없으면 접속 망)이 4곳 이상이면 여러 사람이 같은 아이디를 쓰는 것일 수 있음
+  const SUS_PLACES = 4, SUS_DAYS = 7;
+  function suspicion(u, now) {
+    const seen = new Set();
+    for (const [ip, v] of Object.entries(u.ips || {})) if (v.last >= now - SUS_DAYS * 86400e3) seen.add(place(v.isp, v.city) || ip);
+    return seen.size >= SUS_PLACES ? seen.size : 0;
+  }
 
   function render() {
     const now = data.now;
@@ -118,13 +127,17 @@
       [data.accounts.length, '등록된 계정'], [todayUsers.size, '오늘 접속한 사람'], [total, '누적 접속 횟수'], [fails24, '최근 24시간 로그인 실패'],
     ].map(([n, l]) => `<div class="stat"><b>${n}</b><span>${l}</span></div>`).join('');
 
+    const susCount = Object.values(data.users).filter((u) => suspicion(u, now)).length;
+    $('#stats').insertAdjacentHTML('beforeend', `<div class="stat"><b${susCount ? ' class="t-fail"' : ''}>${susCount}</b><span>중복 사용 의심 계정</span></div>`);
+
     const ids = [...new Set([...data.accounts.map(a => a.id), ...Object.keys(data.users)])];
     const isAdm = Object.fromEntries(data.accounts.map(a => [a.id, a.admin]));
     $('#users').innerHTML = ids.map(id => {
       const u = data.users[id] || { count: 0, ips: {}, fails: 0 };
       const ips = Object.entries(u.ips || {}).sort((a, b) => b[1].last - a[1].last);
+      const sus = suspicion(u, now);
       return `<tr>
-        <td><b>${esc(id)}</b>${isAdm[id] ? '<span class="badge">관리자</span>' : ''}${data.accounts.some(a => a.id === id) ? '' : '<span class="sub"> (삭제된 계정)</span>'}</td>
+        <td><b>${esc(id)}</b>${sus ? `<span class="badge warn" title="최근 ${SUS_DAYS}일 동안 서로 다른 접속 장소 ${sus}곳. 여러 사람이 함께 쓰는지 확인해 보세요">⚠ 의심 ${sus}곳</span>` : ''}${isAdm[id] ? '<span class="badge">관리자</span>' : ''}${data.accounts.some(a => a.id === id) ? '' : '<span class="sub"> (삭제된 계정)</span>'}</td>
         <td>${u.count || 0}회</td>
         <td>${u.last ? esc(fmt(u.last)) + ' <span class="sub">' + esc(ago(u.last, now)) + '</span>' : '<span class="sub">접속 기록 없음</span>'}</td>
         <td title="${esc(u.lastIp || '')}">${esc(shortIp(u.lastIp || '-'))}${place(u.lastIsp, u.lastCity) ? '<div class="sub">' + esc(place(u.lastIsp, u.lastCity)) + '</div>' : ''}</td>
