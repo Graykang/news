@@ -359,8 +359,20 @@
 
   // 시간 표기 갱신 & 자동 새로고침
   setInterval(() => { if (data) renderFeed(); }, 60000);
-  setInterval(() => load(false), 120000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && data) load(false); });
+  // 기사 전체를 다시 받지 않고, 새 수집이 있을 때만 가져옴(휴대폰 데이터 절약)
+  async function poll() {
+    if (!data) return load(false);
+    try {
+      const r = await fetch('/api/news/version', { cache: 'no-store' });
+      if (r.status === 401) { location.href = '/login'; return; }
+      if (!r.ok) return load(false); // 버전 확인이 안 되는 서버면 예전 방식으로
+      const j = await r.json();
+      const known = pending ? pending.updatedAt : data.updatedAt;
+      if (j.updatedAt && j.updatedAt !== known) await load(false);
+    } catch {}
+  }
+  setInterval(poll, 120000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && data) poll(); });
   window.addEventListener('pagehide', () => store.set('lastVisit', Date.now()));
 
   $('#feed').innerHTML = '<div class="sk"></div>'.repeat(5);

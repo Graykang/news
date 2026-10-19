@@ -199,6 +199,7 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === '/' || url.pathname === '/index.html') audit.record('visit', user, auth.clientIp(req), req.headers['user-agent'] || '');
 
+  if (url.pathname === '/api/news/version') return sendJson(res, 200, { updatedAt: collect.getState().updatedAt }); // 가벼운 버전 확인
   if (url.pathname === '/api/news') {
     const state = collect.getState();
     return sendJson(res, 200, {

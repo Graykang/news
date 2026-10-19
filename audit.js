@@ -29,6 +29,16 @@ function device(ua = '') {
 }
 
 // type: 'login' | 'visit' | 'fail'   user: 아이디(실패 시 입력한 아이디)   known: 실패한 아이디가 실제 계정인지
+// IPv6는 앞 4덩어리(/64, 같은 가정·같은 망)가 같으면 같은 곳으로 보고 하나로 묶음. IPv4는 그대로.
+function ipKey(ip) {
+  if (!ip || !ip.includes(':') || ip.includes('.')) return ip;
+  const [head, tail] = ip.split('::');
+  const h = head ? head.split(':') : [];
+  const t = tail === undefined ? null : (tail ? tail.split(':') : []);
+  const groups = t === null ? h : [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill('0'), ...t];
+  return groups.slice(0, 4).map((g) => g.padStart(4, '0')).join(':') + '::/64';
+}
+
 function record(type, user, ip, ua, known = false) {
   const d = load();
   const now = Date.now();
@@ -44,7 +54,16 @@ function record(type, user, ip, ua, known = false) {
   if (type === 'login' || type === 'visit') {
     const u = (d.users[user] ||= { count: 0, first: now, fails: 0, ips: {} });
     u.count++; u.last = now; u.lastSeen = now; u.lastIp = ip; u.lastUa = dev;
-    const e = (u.ips[ip] ||= { n: 0, last: 0 });
+    // 예전 기록(전체 주소 단위)도 같은 기준으로 합쳐서 정리
+    const merged = {};
+    for (const [k, v] of Object.entries(u.ips)) {
+      const nk = ipKey(k);
+      const m = (merged[nk] ||= { n: 0, last: 0, isp: '', city: '' });
+      m.n += v.n || 0; m.last = Math.max(m.last, v.last || 0);
+      m.isp = m.isp || v.isp || ''; m.city = m.city || v.city || '';
+    }
+    u.ips = merged;
+    const e = (u.ips[ipKey(ip)] ||= { n: 0, last: 0, isp: '', city: '' });
     e.n++; e.last = now;
     const keys = Object.keys(u.ips);
     if (keys.length > MAX_IPS) for (const k of keys.sort((a, b) => u.ips[a].last - u.ips[b].last).slice(0, keys.length - MAX_IPS)) delete u.ips[k];

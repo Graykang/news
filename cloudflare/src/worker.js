@@ -136,6 +136,16 @@ function device(ua = '') {
   const br = /Edg\//.test(ua) ? 'Edge' : /SamsungBrowser/.test(ua) ? '삼성인터넷' : /Whale/.test(ua) ? '웨일' : /Chrome|CriOS/.test(ua) ? 'Chrome' : /Firefox|FxiOS/.test(ua) ? 'Firefox' : /Safari/.test(ua) ? 'Safari' : '';
   return br ? `${os} · ${br}` : os;
 }
+// IPv6는 앞 4덩어리(/64, 같은 가정·같은 망)가 같으면 같은 곳으로 보고 하나로 묶음. IPv4는 그대로.
+function ipKey(ip) {
+  if (!ip || !ip.includes(':') || ip.includes('.')) return ip;
+  const [head, tail] = ip.split('::');
+  const h = head ? head.split(':') : [];
+  const t = tail === undefined ? null : (tail ? tail.split(':') : []);
+  const groups = t === null ? h : [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill('0'), ...t];
+  return groups.slice(0, 4).map((g) => g.padStart(4, '0')).join(':') + '::/64';
+}
+
 async function auditRecord(env, request, type, user, known = false) {
   try {
     const now = Date.now();
@@ -149,13 +159,24 @@ async function auditRecord(env, request, type, user, known = false) {
     const ip = request.headers.get('cf-connecting-ip') || '-';
     const dev = device(request.headers.get('user-agent') || '');
     const cc = (request.cf && request.cf.country) || '';
-    d.events.unshift({ t: now, type, user, ip, ua: dev, cc });
+    const isp = String((request.cf && request.cf.asOrganization) || '').slice(0, 40);   // 통신사(접속망) 이름
+    const city = String((request.cf && (request.cf.city || request.cf.region)) || '').slice(0, 30); // 대략적인 지역
+    d.events.unshift({ t: now, type, user, ip, ua: dev, cc, isp, city });
     if (d.events.length > MAX_EVENTS) d.events.length = MAX_EVENTS;
     if (type === 'login' || type === 'visit') {
       const u = (d.users[user] ||= { count: 0, first: now, fails: 0, ips: {} });
-      u.count++; u.last = now; u.lastSeen = now; u.lastIp = ip; u.lastUa = dev; u.lastCc = cc;
-      const e = (u.ips[ip] ||= { n: 0, last: 0 });
-      e.n++; e.last = now;
+      u.count++; u.last = now; u.lastSeen = now; u.lastIp = ip; u.lastUa = dev; u.lastCc = cc; u.lastIsp = isp; u.lastCity = city;
+      // 예전 기록(전체 주소 단위)도 같은 기준으로 합쳐서 정리
+      const merged = {};
+      for (const [k, v] of Object.entries(u.ips)) {
+        const nk = ipKey(k);
+        const m = (merged[nk] ||= { n: 0, last: 0, isp: '', city: '' });
+        m.n += v.n || 0; m.last = Math.max(m.last, v.last || 0);
+        m.isp = m.isp || v.isp || ''; m.city = m.city || v.city || '';
+      }
+      u.ips = merged;
+      const e = (u.ips[ipKey(ip)] ||= { n: 0, last: 0, isp: '', city: '' });
+      e.n++; e.last = now; if (isp) e.isp = isp; if (city) e.city = city;
       const keys = Object.keys(u.ips);
       if (keys.length > MAX_IPS) for (const k of keys.sort((a, b) => u.ips[a].last - u.ips[b].last).slice(0, keys.length - MAX_IPS)) delete u.ips[k];
     } else if (type === 'fail' && known) {
@@ -368,6 +389,15 @@ async function handle(request, env, ctx) {
     return json(404, { error: 'not found' });
   }
   if (path === '/' || path === '/index.html') ctx.waitUntil(auditRecord(env, request, 'visit', user));
+  if (path === '/api/news/version') { // 기사 전체(1MB 이상)를 받지 않고 "새 수집이 있는지"만 확인하는 가벼운 요청
+    const body = await env.NEWS.get('snapshot', { type: 'stream', cacheTtl: 30 });
+    if (!body) return json(503, { error: '아직 수집된 기사가 없습니다.' });
+    const reader = body.getReader();
+    const { value } = await reader.read();
+    reader.cancel().catch(() => {});
+    const m = new TextDecoder().decode((value || new Uint8Array()).slice(0, 120)).match(/"updatedAt":(\d+)/);
+    return json(200, { updatedAt: m ? Number(m[1]) : 0 });
+  }
   if (path === '/api/news') {
     const body = await env.NEWS.get('snapshot', 'stream'); // 파싱 없이 그대로 전달 (CPU 절약)
     if (!body) return json(503, { error: '아직 수집된 기사가 없습니다. 잠시 후 다시 시도해 주세요.' });

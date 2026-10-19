@@ -93,6 +93,9 @@
   const $ = (s) => document.querySelector(s);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const TYPE = { login: '로그인', visit: '방문', fail: '로그인 실패' };
+  // IPv6는 길어서 앞부분만 보이고(마우스를 올리면 전체), 통신사·지역을 함께 보여 줌
+  const shortIp = (ip) => (String(ip).includes(':') && !String(ip).includes('.') ? String(ip).split(':').slice(0, 3).join(':') + ':…' : ip);
+  const place = (isp, city) => [isp, city].filter(Boolean).join(' · ');
   const fmt = (t) => t ? new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '-';
   function ago(t, now) {
     if (!t) return '';
@@ -124,9 +127,9 @@
         <td><b>${esc(id)}</b>${isAdm[id] ? '<span class="badge">관리자</span>' : ''}${data.accounts.some(a => a.id === id) ? '' : '<span class="sub"> (삭제된 계정)</span>'}</td>
         <td>${u.count || 0}회</td>
         <td>${u.last ? esc(fmt(u.last)) + ' <span class="sub">' + esc(ago(u.last, now)) + '</span>' : '<span class="sub">접속 기록 없음</span>'}</td>
-        <td>${esc(u.lastIp || '-')}${u.lastCc ? ' <span class="sub">' + esc(u.lastCc) + '</span>' : ''}</td>
+        <td title="${esc(u.lastIp || '')}">${esc(shortIp(u.lastIp || '-'))}${place(u.lastIsp, u.lastCity) ? '<div class="sub">' + esc(place(u.lastIsp, u.lastCity)) + '</div>' : ''}</td>
         <td>${esc(u.lastUa || '-')}</td>
-        <td>${ips.length ? `<details class="ips"><summary>${ips.length}개</summary>${ips.map(([ip, v]) => `<div>${esc(ip)} · ${v.n}회 · ${esc(fmt(v.last))}</div>`).join('')}</details>` : '-'}</td>
+        <td>${ips.length ? `<details class="ips"><summary>${ips.length}개</summary>${ips.map(([ip, v]) => `<div>${esc(ip)}${place(v.isp, v.city) ? ' · ' + esc(place(v.isp, v.city)) : ''} · ${v.n}회 · ${esc(fmt(v.last))}</div>`).join('')}</details>` : '-'}</td>
         <td>${u.fails ? `<span class="t-fail">${u.fails}회</span> <span class="sub">${esc(fmt(u.lastFail))}</span>` : '0'}</td>
       </tr>`;
     }).join('') || '<tr><td colspan="7" class="sub">계정이 없습니다.</td></tr>';
@@ -140,7 +143,7 @@
     const u = $('#fu').value, t = $('#ft').value;
     const list = data.events.filter(e => (!u || e.user === u) && (!t || e.type === t));
     $('#events').innerHTML = list.slice(0, shown).map(e =>
-      `<tr><td>${esc(fmt(e.t))} <span class="sub">${esc(ago(e.t, data.now))}</span></td><td>${esc(e.user)}</td><td class="t-${esc(e.type)}">${esc(TYPE[e.type] || e.type)}</td><td>${esc(e.ip)}${e.cc ? ' <span class="sub">' + esc(e.cc) + '</span>' : ''}</td><td>${esc(e.ua)}</td></tr>`
+      `<tr><td>${esc(fmt(e.t))} <span class="sub">${esc(ago(e.t, data.now))}</span></td><td>${esc(e.user)}</td><td class="t-${esc(e.type)}">${esc(TYPE[e.type] || e.type)}</td><td title="${esc(e.ip)}">${esc(shortIp(e.ip))}${place(e.isp, e.city) ? '<div class="sub">' + esc(place(e.isp, e.city)) + '</div>' : ''}</td><td>${esc(e.ua)}</td></tr>`
     ).join('') || '<tr><td colspan="5" class="sub">기록이 없습니다.</td></tr>';
     $('#more').hidden = list.length <= shown;
   }
