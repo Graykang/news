@@ -14,7 +14,6 @@
     { id: 'politics', name: '정치', desc: '' },
     { id: 'society', name: '사회', desc: '' },
     { id: 'world', name: '세계', desc: '' },
-    { id: 'culture', name: '생활문화', desc: '' },
     { id: 'entertainment', name: '연예', desc: '' },
     { id: 'sports', name: '스포츠', desc: '' },
     { id: 'daily', name: '날씨·운세', desc: '날씨 예보·기상 기사와 오늘의 운세·띠별 운세 (제목 키워드로 분류)' },
