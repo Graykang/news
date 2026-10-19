@@ -94,7 +94,7 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const TYPE = { login: '로그인', visit: '방문', fail: '로그인 실패' };
   // IPv6는 길어서 앞부분만 보이고(마우스를 올리면 전체), 통신사·지역을 함께 보여 줌
-  const shortIp = (ip) => (String(ip).includes(':') && !String(ip).includes('.') ? String(ip).split(':').slice(0, 3).join(':') + ':…' : ip);
+  const shortIp = (ip) => (String(ip).includes(':') && !String(ip).includes('.') ? String(ip).split(':').slice(0, 3).map((g) => g.replace(/^0+(?=.)/, '')).join(':') + ':…' : ip);
   const place = (isp, city) => [isp, city].filter(Boolean).join(' · ');
   const fmt = (t) => t ? new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '-';
   function ago(t, now) {
@@ -129,7 +129,7 @@
         <td>${u.last ? esc(fmt(u.last)) + ' <span class="sub">' + esc(ago(u.last, now)) + '</span>' : '<span class="sub">접속 기록 없음</span>'}</td>
         <td title="${esc(u.lastIp || '')}">${esc(shortIp(u.lastIp || '-'))}${place(u.lastIsp, u.lastCity) ? '<div class="sub">' + esc(place(u.lastIsp, u.lastCity)) + '</div>' : ''}</td>
         <td>${esc(u.lastUa || '-')}</td>
-        <td>${ips.length ? `<details class="ips"><summary>${ips.length}개</summary>${ips.map(([ip, v]) => `<div>${esc(ip)}${place(v.isp, v.city) ? ' · ' + esc(place(v.isp, v.city)) : ''} · ${v.n}회 · ${esc(fmt(v.last))}</div>`).join('')}</details>` : '-'}</td>
+        <td>${ips.length ? `<details class="ips"><summary>${ips.length}개</summary>${ips.map(([ip, v]) => `<div title="${esc(ip)}">${esc(shortIp(ip))}${place(v.isp, v.city) ? ' · ' + esc(place(v.isp, v.city)) : ''} · ${v.n}회 · ${esc(fmt(v.last))}</div>`).join('')}</details>` : '-'}</td>
         <td>${u.fails ? `<span class="t-fail">${u.fails}회</span> <span class="sub">${esc(fmt(u.lastFail))}</span>` : '0'}</td>
       </tr>`;
     }).join('') || '<tr><td colspan="7" class="sub">계정이 없습니다.</td></tr>';

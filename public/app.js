@@ -371,8 +371,10 @@
   function fillSplash(j) {
     profile = { welcome: j.welcome || '' };
     if (!splashOn) return;
-    $('#spHello').textContent = `${j.user}님, ${greeting()}`;
-    $('#spMsg').textContent = profile.welcome;
+    // 관리자 메시지가 있으면 그것이 주인공, 없으면 "이름님, 시간대 인사"가 주인공
+    const hi = `${j.user}님, ${greeting()}`;
+    $('#spHello').textContent = profile.welcome ? hi : '';
+    $('#spMsg').textContent = profile.welcome || hi;
     try {
       const q = window.kangsQuoteOfDay();
       $('#spQuote').textContent = `“${q.text}”`;

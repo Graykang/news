@@ -183,6 +183,8 @@ mark { background: color-mix(in srgb, #facc15 45%, transparent); color: inherit;
 .sp-hello { margin: 0; font-size: 15px; font-weight: 700; }
 .sp-msg { margin: 16px 0 0; font-family: 'GmarketSans', 'Malgun Gothic', sans-serif; font-weight: 700; font-size: 25px; line-height: 1.4; color: #fff4dc; text-shadow: 0 2px 14px rgba(0,0,0,.55); word-break: keep-all; } /* 관리자 메시지: 지마켓 산스 + 크림 화이트 */
 .sp-rule { width: 36px; height: 2px; margin: 20px auto 16px; border-radius: 2px; background: #f4d9a0; }
+.sp-hello:empty { display: none; }
+.sp-hello + .sp-msg { margin-top: 16px; }
 .sp-msg:empty { display: none; }
 .sp-msg:empty + .sp-rule { display: none; }
 .sp-quote { margin: 0; font-family: 'BMDoHyeon', 'Malgun Gothic', sans-serif; font-size: 18px; line-height: 1.55; color: rgba(255,255,255,.95); word-break: keep-all; } /* 오늘의 명언: 배민 도현 */
