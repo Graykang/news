@@ -12,8 +12,10 @@
     { id: 'politics', name: '정치', desc: '' },
     { id: 'society', name: '사회', desc: '' },
     { id: 'world', name: '국제', desc: '' },
+    { id: 'sports', name: '스포츠', desc: '' },
     { id: 'opinion', name: '사설·칼럼', desc: '신문사 사설과 오피니언' },
     { id: 'policy', name: '제도·정책', desc: '시행·개정·도입 등 앞으로 바뀌는 제도와 정책 관련 기사' },
+    { id: 'mine', name: '★ 내 키워드', desc: '내가 등록한 키워드가 제목·요약에 들어 있는 기사만 모아 보여 줍니다. 키워드는 내 계정에만 저장되며 다른 가족에게는 보이지 않습니다.' },
     { id: 'all', name: '전체', desc: '' },
   ];
 
@@ -32,6 +34,44 @@
 
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const safeUrl = (u) => (/^https?:\/\//i.test(u) ? u : '#');
+
+  // ── 내 키워드 (계정별로 서버에 저장) ──
+  let kw = { include: [], exclude: [] };
+  const norm = (s) => String(s).trim().toLowerCase();
+  function kwMatch(c) {
+    if (!kw.include.length) return [];
+    const h = (c._h ??= (c.title + ' ' + c.summary + ' ' + c.others.map(o => o.title).join(' ')).toLowerCase());
+    if (kw.exclude.some(k => h.includes(norm(k)))) return [];
+    return kw.include.filter(k => h.includes(norm(k)));
+  }
+  function hl(text) { // 키워드를 <mark>로 강조 (HTML 안전하게)
+    const ks = kw.include.map(norm).filter(Boolean);
+    if (!ks.length) return esc(text);
+    const re = new RegExp('(' + ks.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')', 'gi');
+    return String(text).split(re).map((p, i) => (i % 2 ? `<mark>${esc(p)}</mark>` : esc(p))).join('');
+  }
+  function renderKw() {
+    const chips = (list, type) => list.length
+      ? list.map((k, i) => `<span class="kwchip ${type}">${esc(k)}<button type="button" data-type="${type}" data-i="${i}" aria-label="${esc(k)} 삭제">×</button></span>`).join('')
+      : '<span class="kwnone">없음</span>';
+    $('#kwinc').innerHTML = chips(kw.include, 'include');
+    $('#kwexc').innerHTML = chips(kw.exclude, 'exclude');
+  }
+  let kwTimer;
+  function saveKw() {
+    clearTimeout(kwTimer);
+    kwTimer = setTimeout(() => {
+      fetch('/api/keywords', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(kw) }).catch(() => {});
+    }, 400);
+  }
+  function addKw(type, raw) {
+    const list = kw[type];
+    for (let k of String(raw).split(/[,\n]/)) {
+      k = k.trim().slice(0, 40);
+      if (k && list.length < 30 && !list.some(x => norm(x) === norm(k))) list.push(k);
+    }
+    saveKw(); renderKw(); renderTabs(); shown = PAGE; renderFeed();
+  }
 
   function ago(ts) {
     const m = Math.round((Date.now() - ts) / 60000);
@@ -61,7 +101,8 @@
       if (!outs.some(o => !off.has(o))) return false;
       if (q && !(c.title + ' ' + c.summary + ' ' + c.others.map(o => o.title).join(' ')).toLowerCase().includes(q)) return false;
       switch (tab) {
-        case 'issue': return c.count >= 3 && now - c.ts < 24 * 36e5 && c.cat !== 'opinion';
+        case 'issue': return c.count >= 3 && now - c.ts < 24 * 36e5 && c.cat !== 'opinion' && c.cat !== 'sports';
+        case 'mine': return kwMatch(c).length > 0;
         case 'policy': return c.policy;
         case 'all': return true;
         case 'opinion': return c.cat === 'opinion' && (sub === 'all' || (sub === 'ed') === !!c.editorial);
@@ -80,7 +121,8 @@
       for (const k of c.cats) if (out[k] != null) out[k]++;
       if (c.policy) out.policy++;
       if (c.cat === 'opinion' && c.editorial) out.opinion_ed = (out.opinion_ed || 0) + 1;
-      if (c.count >= 3 && now - c.ts < 24 * 36e5 && c.cat !== 'opinion') out.issue++;
+      if (c.count >= 3 && now - c.ts < 24 * 36e5 && c.cat !== 'opinion' && c.cat !== 'sports') out.issue++;
+      if (kw.include.length && kwMatch(c).length) out.mine++;
     }
     return out;
   }
@@ -105,9 +147,10 @@
           <span class="sep">·</span><span>${esc(catName)}</span>
           ${isNew ? '<span class="tag new">NEW</span>' : ''}
           ${c.policy && tab !== 'policy' ? '<span class="tag">제도·정책</span>' : ''}
+          ${tab !== 'mine' && kw.include.length && kwMatch(c).length ? '<span class="tag kw">★ 키워드</span>' : ''}
         </div>
-        <a class="title" href="${esc(safeUrl(c.link))}" target="_blank" rel="noopener noreferrer">${esc(c.title)}</a>
-        ${c.summary ? `<p class="sum">${esc(c.summary)}</p>` : ''}
+        <a class="title" href="${esc(safeUrl(c.link))}" target="_blank" rel="noopener noreferrer">${tab === 'mine' ? hl(c.title) : esc(c.title)}</a>
+        ${c.summary ? `<p class="sum">${tab === 'mine' ? hl(c.summary) : esc(c.summary)}</p>` : ''}
         ${c.author ? `<div class="byline">${esc(c.author.replace(/\s*기자$/, ''))} 기자</div>` : ''}
         ${others}
       </div>
@@ -136,6 +179,8 @@
       $('#desc').textContent = t.desc || '';
     }
     $('#desc').hidden = tab !== 'opinion' && !t.desc;
+    $('#kwbox').hidden = tab !== 'mine';
+    if (tab === 'mine') renderKw();
     let html = '', lastDay = '';
     const slice = list.slice(0, shown);
     for (const c of slice) {
@@ -148,7 +193,7 @@
     $('#feed').innerHTML = html;
     $('#more').hidden = list.length <= shown;
     $('#empty').hidden = list.length > 0;
-    if (!list.length) $('#empty').textContent = query ? '검색 결과가 없습니다.' : '표시할 기사가 없습니다.';
+    if (!list.length) $('#empty').textContent = query ? '검색 결과가 없습니다.' : tab === 'mine' ? (kw.include.length ? '키워드에 해당하는 최근 기사가 없습니다.' : '위에서 키워드를 추가해 보세요. 예: 금리, 삼성전자, 부동산') : '표시할 기사가 없습니다.';
   }
   function renderMeta() {
     $('#whoname').textContent = me;
@@ -232,6 +277,20 @@
     location.href = '/login';
   });
 
+  // 키워드 편집
+  $('#kwbox').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const f = e.target.closest('form'); if (!f) return;
+    const inp = f.querySelector('input');
+    addKw(f.dataset.type, inp.value);
+    inp.value = ''; inp.focus();
+  });
+  $('#kwbox').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-i]'); if (!b) return;
+    kw[b.dataset.type].splice(Number(b.dataset.i), 1);
+    saveKw(); renderKw(); renderTabs(); shown = PAGE; renderFeed();
+  });
+
   // 테마
   const root = document.documentElement;
   const savedTheme = store.get('theme', null);
@@ -251,5 +310,9 @@
   $('#feed').innerHTML = '<div class="sk"></div>'.repeat(5);
   $('#today').textContent = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
   fetch('/api/me').then(r => r.json()).then(j => { me = j.user || ''; $('#whoname').textContent = me; $('#adminlink').hidden = !j.admin; }).catch(() => {});
+  fetch('/api/keywords').then(r => r.json()).then(j => {
+    kw = { include: j.include || [], exclude: j.exclude || [] };
+    if (data) { renderTabs(); renderFeed(); }
+  }).catch(() => {});
   load(true);
 })();

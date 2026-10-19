@@ -86,6 +86,31 @@ const server = http.createServer(async (req, res) => {
   const admin = auth.isAdmin(user);
   if (url.pathname === '/api/me') return sendJson(res, 200, { user, admin });
 
+  // ── 내 키워드 (계정별 저장: keywords.json) ──
+  if (url.pathname === '/api/keywords') {
+    const KF = path.join(__dirname, 'keywords.json');
+    const readKw = () => { try { return JSON.parse(fs.readFileSync(KF, 'utf8')); } catch { return {}; } };
+    if (req.method === 'GET') return sendJson(res, 200, readKw()[user] || { include: [], exclude: [] });
+    if (req.method === 'PUT') {
+      if (!sameOrigin(req)) return sendJson(res, 403, { error: '허용되지 않은 요청입니다.' });
+      let body;
+      try { body = JSON.parse(await readBody(req, 16384)); } catch { return sendJson(res, 400, { error: '잘못된 요청입니다.' }); }
+      const clean = (a) => {
+        const seen = new Set(), out = [];
+        for (const v of Array.isArray(a) ? a : []) {
+          const k = String(v).trim().slice(0, 40);
+          if (k && !seen.has(k.toLowerCase()) && out.length < 30) { seen.add(k.toLowerCase()); out.push(k); }
+        }
+        return out;
+      };
+      const all = readKw();
+      all[user] = { include: clean(body.include), exclude: clean(body.exclude) };
+      try { fs.writeFileSync(KF, JSON.stringify(all)); } catch {}
+      return sendJson(res, 200, all[user]);
+    }
+    return sendJson(res, 405, { error: 'method not allowed' });
+  }
+
   // ── 관리자 전용 ──
   if (url.pathname === '/admin' || url.pathname === '/admin.html') {
     if (!admin) { res.writeHead(302, { location: '/' }); return res.end(); }

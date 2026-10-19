@@ -38,6 +38,18 @@
     <div class="chips" id="outlets" aria-label="매체 선택"></div>
   </div>
   <div class="newbar" id="newbar" hidden></div>
+  <div class="kwbox" id="kwbox" hidden>
+    <div class="kwrow">
+      <b>찾을 키워드</b>
+      <div class="kwchips" id="kwinc"></div>
+      <form class="kwform" data-type="include"><input placeholder="예: 금리, 삼성전자 (쉼표로 여러 개)" maxlength="120" autocomplete="off"><button type="submit">추가</button></form>
+    </div>
+    <div class="kwrow">
+      <b>제외할 단어</b>
+      <div class="kwchips" id="kwexc"></div>
+      <form class="kwform" data-type="exclude"><input placeholder="이 단어가 들어간 기사는 숨김 (예: 광고, 이벤트)" maxlength="120" autocomplete="off"><button type="submit">추가</button></form>
+    </div>
+  </div>
   <p class="desc" id="desc"></p>
   <div id="feed" aria-live="polite"></div>
   <button class="more" id="more" hidden>더 보기</button>

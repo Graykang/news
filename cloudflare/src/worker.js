@@ -234,6 +234,33 @@ async function handle(request, env, ctx) {
   const admin = !!(await loadUsers(env))[user]?.admin;
   if (path === '/api/me') return json(200, { user, admin });
 
+  // ── 내 키워드 (계정별 저장: KV 키 kw:<아이디>) ──
+  if (path === '/api/keywords') {
+    const key = 'kw:' + user;
+    if (request.method === 'GET') return json(200, (await env.NEWS.get(key, 'json')) || { include: [], exclude: [] });
+    if (request.method === 'PUT') {
+      if (!sameOrigin(request)) return json(403, { error: '허용되지 않은 요청입니다.' });
+      let body;
+      try {
+        const raw = await request.text();
+        if (raw.length > 16384) throw new Error('large');
+        body = JSON.parse(raw);
+      } catch { return json(400, { error: '잘못된 요청입니다.' }); }
+      const clean = (a) => {
+        const seen = new Set(), out = [];
+        for (const v of Array.isArray(a) ? a : []) {
+          const k = String(v).trim().slice(0, 40);
+          if (k && !seen.has(k.toLowerCase()) && out.length < 30) { seen.add(k.toLowerCase()); out.push(k); }
+        }
+        return out;
+      };
+      const val = { include: clean(body.include), exclude: clean(body.exclude) };
+      await env.NEWS.put(key, JSON.stringify(val));
+      return json(200, val);
+    }
+    return json(405, { error: 'method not allowed' });
+  }
+
   // ── 관리자 전용 ──
   if (path === '/admin' || path === '/admin.html') {
     if (!admin) return Response.redirect(url.origin + '/', 302);
@@ -296,6 +323,7 @@ async function handle(request, env, ctx) {
       if (id === user) return json(400, { error: '자기 자신은 삭제할 수 없습니다.' });
       delete web[id];
       await save();
+      try { await env.NEWS.delete('kw:' + id); } catch {}
       return json(200, { ok: true });
     }
     if (sub === '/admin') {
