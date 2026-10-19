@@ -352,7 +352,7 @@
   let profile = { welcome: '', motto: '' };
   const splashEl = $('#splash');
   const splashOn = document.documentElement.classList.contains('splash-on'); // 오늘 아직 안 봤을 때만 켜짐(head의 짧은 스크립트가 판단)
-  let splashT0 = performance.now(), splashMin = 1300, splashFilled = false, splashDone = false;
+  let splashDone = false;
   function greeting() {
     const h = new Date().getHours();
     return h < 5 ? '편안한 밤 되세요' : h < 11 ? '좋은 아침입니다' : h < 14 ? '즐거운 점심시간입니다' : h < 18 ? '좋은 오후입니다' : h < 22 ? '좋은 저녁입니다' : '편안한 밤 되세요';
@@ -377,20 +377,13 @@
     $('#spMsg').textContent = profile.welcome;
     $('#spMotto').textContent = profile.motto ? `“${profile.motto}”` : '';
     $('#spAuto').textContent = manual ? '로그인되었습니다' : '자동 로그인되었습니다';
-    splashMin = (profile.welcome || profile.motto) ? 2300 : 1300; // 문구가 있으면 읽을 시간을 조금 더
-    splashT0 = performance.now();
-    splashFilled = true;
     splashEl.classList.add('sp-ready');
   }
   if (splashOn) {
-    splashEl.addEventListener('click', endSplash);          // 화면을 누르면 바로 건너뜀
-    document.addEventListener('keydown', endSplash, { once: true });
-    const bootT0 = performance.now();
-    const tick = setInterval(() => {
-      const now = performance.now();
-      // 문구를 보여 준 뒤 최소 시간이 지나고 기사 목록도 준비됐을 때 사라짐(기다리게 하지 않음). 무슨 일이 있어도 4.5초면 종료
-      if ((splashFilled && now - splashT0 >= splashMin && appReady) || now - bootT0 > 4500) { clearInterval(tick); endSplash(); }
-    }, 100);
+    // 자동으로 사라지지 않고, 확인 버튼(또는 Enter/Esc)을 눌러야 넘어감. 그 사이 뒤에서 기사 목록을 미리 불러옴
+    $('#spOk').addEventListener('click', endSplash);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'Escape') endSplash(); });
+    setTimeout(() => $('#spOk').focus(), 60);
   }
 
   const dlg = $('#prof');
