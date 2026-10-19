@@ -10,7 +10,6 @@
     { id: 'economy', name: '경제', desc: '경제·금융·기업 소식을 한곳에 모았습니다' },
     { id: 'securities', name: '증권', desc: '증시·주가·종목·상장 등 (경제의 하위 분류, 제목 키워드와 증권 피드로 분류)' },
     { id: 'realestate', name: '부동산', desc: '부동산 전용 피드와 제목 키워드(아파트·전세·청약 등)로 모은 기사' },
-    { id: 'education', name: '교육', desc: '교육 피드와 제목 키워드(수능·입시·교육부 등)로 모은 기사' },
     { id: 'tech', name: 'IT과학', desc: 'IT·과학 피드와 제목 키워드(AI·반도체·우주 등)로 모은 기사' },
     { id: 'politics', name: '정치', desc: '' },
     { id: 'society', name: '사회', desc: '' },
@@ -21,7 +20,6 @@
     { id: 'weather', name: '날씨', desc: '날씨 예보와 기상 관련 기사 (제목 키워드로 분류)' },
     { id: 'fortune', name: '운세', desc: '오늘의 운세·띠별 운세 (제목 키워드로 분류)' },
     { id: 'opinion', name: '사설·칼럼', desc: '신문사 사설과 오피니언' },
-    { id: 'policy', name: '제도·정책', desc: '시행·개정·도입 등 앞으로 바뀌는 제도와 정책 관련 기사' },
     { id: 'mine', name: '★ 내 키워드', desc: '내가 등록한 키워드가 제목·요약에 들어 있는 기사만 모아 보여 줍니다. 키워드는 내 계정에만 저장되며 다른 가족에게는 보이지 않습니다.' },
     { id: 'all', name: '전체', desc: '' },
   ];
@@ -111,7 +109,6 @@
       if (q && !(c.title + ' ' + c.summary + ' ' + c.others.map(o => o.title).join(' ')).toLowerCase().includes(q)) return false;
       switch (tab) {
         case 'mine': return kwMatch(c).length > 0;
-        case 'policy': return c.policy;
         case 'all': return true;
         case 'opinion': return c.cat === 'opinion' && (sub === 'all' || (sub === 'ed') === !!c.editorial);
         default: return c.cats.includes(tab);
@@ -142,7 +139,6 @@
     for (const c of data.clusters) {
       out.all++;
       for (const k of c.cats) if (out[k] != null) out[k]++;
-      if (c.policy) out.policy++;
       if (c.cat === 'opinion' && c.editorial) out.opinion_ed = (out.opinion_ed || 0) + 1;
       if (kw.include.length && kwMatch(c).length) out.mine++;
     }
@@ -168,7 +164,6 @@
           <span class="sep">·</span><span>${ago(c.ts)}</span>
           <span class="sep">·</span><span>${esc(catName)}</span>
           ${isNew ? '<span class="tag new">NEW</span>' : ''}
-          ${c.policy && tab !== 'policy' ? '<span class="tag">제도·정책</span>' : ''}
           ${tab !== 'mine' && kw.include.length && kwMatch(c).length ? '<span class="tag kw">★ 키워드</span>' : ''}
         </div>
         <a class="title" href="${esc(safeUrl(c.link))}" target="_blank" rel="noopener noreferrer">${tab === 'mine' ? hl(c.title) : esc(c.title)}</a>
