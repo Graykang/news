@@ -108,8 +108,8 @@
     return h < 48 ? h + '시간 전' : Math.floor(h / 24) + '일 전';
   }
   let data = null, shown = 50;
-  // 의심 표시: 최근 7일 안에 서로 다른 통신사·지역(위치 정보가 없으면 접속 망)이 4곳 이상이면 여러 사람이 같은 아이디를 쓰는 것일 수 있음
-  const SUS_PLACES = 4, SUS_DAYS = 7;
+  // 의심 표시: 최근 4일 안에 서로 다른 통신사·지역(위치 정보가 없으면 접속 망)이 4곳 이상이면 여러 사람이 같은 아이디를 쓰는 것일 수 있음
+  const SUS_PLACES = 4, SUS_DAYS = 4;
   function suspicion(u, now) {
     const seen = new Set();
     for (const [ip, v] of Object.entries(u.ips || {})) if (v.last >= now - SUS_DAYS * 86400e3) seen.add(place(v.isp, v.city) || ip);
