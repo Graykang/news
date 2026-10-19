@@ -7,9 +7,7 @@
 
   const PAGE = 40;
   const TABS = [
-    { id: 'economy', name: '경제', desc: '' },
-    { id: 'finance', name: '금융', desc: '은행·금리·대출·보험·가상자산 등 (경제의 하위 분류, 제목 키워드와 금융 피드로 분류)' },
-    { id: 'corporate', name: '기업', desc: '기업 소식·실적·인수합병 등 (경제의 하위 분류, 제목 키워드와 산업 피드로 분류)' },
+    { id: 'economy', name: '경제', desc: '경제·금융·기업 소식을 한곳에 모았습니다' },
     { id: 'securities', name: '증권', desc: '증시·주가·종목·상장 등 (경제의 하위 분류, 제목 키워드와 증권 피드로 분류)' },
     { id: 'realestate', name: '부동산', desc: '부동산 전용 피드와 제목 키워드(아파트·전세·청약 등)로 모은 기사' },
     { id: 'education', name: '교육', desc: '교육 피드와 제목 키워드(수능·입시·교육부 등)로 모은 기사' },
