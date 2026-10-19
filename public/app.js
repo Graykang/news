@@ -18,6 +18,7 @@
     { id: 'sports', name: '스포츠', desc: '' },
     { id: 'daily', name: '날씨·운세', desc: '날씨 예보·기상 기사와 오늘의 운세·띠별 운세 (제목 키워드로 분류)' },
     { id: 'opinion', name: '사설·칼럼', desc: '신문사 사설과 오피니언' },
+    { id: 'cartoon', name: '만평', desc: '경향신문·한겨레의 시사 풍자 만평(그림). 클릭하면 원문 페이지가 열립니다.' },
     { id: 'mine', name: '★ 내 키워드', desc: '내가 등록한 키워드가 제목·요약에 들어 있는 기사만 모아 보여 줍니다. 키워드는 내 계정에만 저장되며 다른 가족에게는 보이지 않습니다.' },
     { id: 'all', name: '전체', desc: '' },
   ];
@@ -149,7 +150,7 @@
   function cardHtml(c) {
     const o = data.outlets[c.outlet];
     const isNew = lastVisit && c.ts > lastVisit;
-    const cls = ['card', c.image ? 'has-img' : '', read.has(c.id) ? 'read' : ''].join(' ');
+    const cls = ['card', c.image ? 'has-img' : '', c.cat === 'cartoon' ? 'toon' : '', read.has(c.id) ? 'read' : ''].join(' ');
     const catName = (data.categories.find(k => k.id === c.cat) || {}).name || '';
     const others = c.others.length
       ? `<details class="others"><summary><b>${c.count}개 매체</b>가 함께 보도 ▾</summary><ul>${
