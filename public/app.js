@@ -169,7 +169,7 @@
         </div>
         <a class="title" href="${esc(safeUrl(c.link))}" target="_blank" rel="noopener noreferrer">${tab === 'mine' ? hl(c.title) : esc(c.title)}</a>
         ${c.summary ? `<p class="sum">${tab === 'mine' ? hl(c.summary) : esc(c.summary)}</p>` : ''}
-        ${c.author ? `<div class="byline">${esc(c.author.replace(/\s*기자$/, ''))} 기자</div>` : ''}
+        ${c.author ? `<div class="byline">${esc(c.author.replace(/\s*(기자|화백)$/, ''))} ${c.cat === 'cartoon' ? '화백' : '기자'}</div>` : ''}
         ${others}
       </div>
       ${img}
