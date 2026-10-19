@@ -17,8 +17,7 @@
     { id: 'culture', name: '생활문화', desc: '' },
     { id: 'entertainment', name: '연예', desc: '' },
     { id: 'sports', name: '스포츠', desc: '' },
-    { id: 'weather', name: '날씨', desc: '날씨 예보와 기상 관련 기사 (제목 키워드로 분류)' },
-    { id: 'fortune', name: '운세', desc: '오늘의 운세·띠별 운세 (제목 키워드로 분류)' },
+    { id: 'daily', name: '날씨·운세', desc: '날씨 예보·기상 기사와 오늘의 운세·띠별 운세 (제목 키워드로 분류)' },
     { id: 'opinion', name: '사설·칼럼', desc: '신문사 사설과 오피니언' },
     { id: 'mine', name: '★ 내 키워드', desc: '내가 등록한 키워드가 제목·요약에 들어 있는 기사만 모아 보여 줍니다. 키워드는 내 계정에만 저장되며 다른 가족에게는 보이지 않습니다.' },
     { id: 'all', name: '전체', desc: '' },
@@ -109,6 +108,7 @@
       if (q && !(c.title + ' ' + c.summary + ' ' + c.others.map(o => o.title).join(' ')).toLowerCase().includes(q)) return false;
       switch (tab) {
         case 'mine': return kwMatch(c).length > 0;
+        case 'daily': return c.cats.includes('weather') || c.cats.includes('fortune');
         case 'all': return true;
         case 'opinion': return c.cat === 'opinion' && (sub === 'all' || (sub === 'ed') === !!c.editorial);
         default: return c.cats.includes(tab);
@@ -139,6 +139,7 @@
     for (const c of data.clusters) {
       out.all++;
       for (const k of c.cats) if (out[k] != null) out[k]++;
+      if (c.cats.includes('weather') || c.cats.includes('fortune')) out.daily++;
       if (c.cat === 'opinion' && c.editorial) out.opinion_ed = (out.opinion_ed || 0) + 1;
       if (kw.include.length && kwMatch(c).length) out.mine++;
     }
