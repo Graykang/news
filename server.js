@@ -59,7 +59,7 @@ const server = http.createServer(async (req, res) => {
         const raw = await readBody(req);
         body = (req.headers['content-type'] || '').includes('json') ? JSON.parse(raw) : Object.fromEntries(new URLSearchParams(raw));
       } catch { return sendJson(res, 400, { error: '잘못된 요청입니다.' }); }
-      const r = auth.login(req, body.username, body.password);
+      const r = auth.login(req, body.username, body.password, body.remember !== false);
       const ip = auth.clientIp(req), ua = req.headers['user-agent'] || '';
       if (!r.ok) {
         if (r.status === 401) audit.record('fail', r.id, ip, ua, Object.prototype.hasOwnProperty.call(auth.loadUsers(), r.id));
@@ -86,7 +86,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   const admin = auth.isAdmin(user);
-  if (url.pathname === '/api/me') return sendJson(res, 200, { user, admin });
+  if (url.pathname === '/api/me') { const renew = auth.renewCookie(req); return sendJson(res, 200, { user, admin }, renew ? { 'set-cookie': renew } : {}); }
 
   // ── 내 키워드 (계정별 저장: keywords.json) ──
   if (url.pathname === '/api/keywords') {

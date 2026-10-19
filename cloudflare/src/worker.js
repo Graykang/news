@@ -13,7 +13,8 @@
 import { fetchTicker } from '../../lib/ticker.js';
 
 const COOKIE = 'nm_session';
-const SESSION_MS = 30 * 24 * 3600 * 1000;
+const SESSION_MS = 30 * 24 * 3600 * 1000; // '로그인 상태 유지' 선택 시 30일(사용할 때마다 연장)
+const SHORT_MS = 12 * 3600 * 1000; // 선택 안 하면 12시간, 브라우저를 닫으면 로그아웃
 const MAX_FAILS = 5;
 const LOCK_SEC = 15 * 60;
 const enc = new TextEncoder();
@@ -74,8 +75,8 @@ async function verifyPassword(pw, stored) {
   if (alg !== 'hs256' || !saltHex || !hashHex) return false;
   return safeEqual(toHex(await hmac(fromHex(saltHex), pw)), hashHex);
 }
-async function makeToken(env, user) {
-  const body = b64url(enc.encode(JSON.stringify({ u: user, exp: Date.now() + SESSION_MS })));
+async function makeToken(env, user, remember = true) {
+  const body = b64url(enc.encode(JSON.stringify({ u: user, exp: Date.now() + (remember ? SESSION_MS : SHORT_MS), rm: remember ? 1 : 0 })));
   return `${body}.${b64url(await hmac(enc.encode(env.SESSION_SECRET), body))}`;
 }
 async function readToken(env, token) {
@@ -84,8 +85,8 @@ async function readToken(env, token) {
   const good = b64url(await hmac(enc.encode(env.SESSION_SECRET), body));
   if (!safeEqual(sig, good)) return null;
   try {
-    const { u, exp } = JSON.parse(b64urlToStr(body));
-    return u && exp > Date.now() ? u : null;
+    const { u, exp, rm } = JSON.parse(b64urlToStr(body));
+    return u && exp > Date.now() ? { u, exp, rm: !!rm } : null;
   } catch { return null; }
 }
 function getCookie(request, name) {
@@ -97,10 +98,10 @@ function getCookie(request, name) {
 }
 async function currentUser(request, env) {
   if (!env.SESSION_SECRET) return null;
-  const u = await readToken(env, getCookie(request, COOKIE));
-  return u && Object.prototype.hasOwnProperty.call(await loadUsers(env), u) ? u : null; // 계정을 지우면 곧(최대 30초) 로그아웃
+  const t = await readToken(env, getCookie(request, COOKIE));
+  return t && Object.prototype.hasOwnProperty.call(await loadUsers(env), t.u) ? t.u : null; // 계정을 지우면 곧(최대 30초) 로그아웃
 }
-const sessionCookie = (token, maxAge) => `${COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
+const sessionCookie = (token, maxAge) => `${COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax${maxAge == null ? '' : `; Max-Age=${maxAge}`}`; // maxAge가 null이면 세션 쿠키
 
 // ───── 로그인 시도 제한 (KV 사용: 실패 때만 기록) ─────
 // KV 장애·무료 쓰기 한도 초과 시에도 로그인 자체는 동작하도록 모두 try/catch 처리
@@ -213,7 +214,8 @@ async function handle(request, env, ctx) {
       if (!ok) { await recordFail(env, keys); ctx.waitUntil(auditRecord(env, request, 'fail', id, known)); return json(401, { error: '아이디 또는 비밀번호가 올바르지 않습니다.' }); }
       await clearFails(env, keys);
       ctx.waitUntil(auditRecord(env, request, 'login', id));
-      return json(200, { ok: true }, { 'set-cookie': sessionCookie(await makeToken(env, id), SESSION_MS / 1000) });
+      const remember = body.remember !== false;
+      return json(200, { ok: true }, { 'set-cookie': sessionCookie(await makeToken(env, id, remember), remember ? SESSION_MS / 1000 : null) });
     }
     if (await currentUser(request, env)) return Response.redirect(url.origin + '/', 302);
     const page = await env.ASSETS.fetch(new Request(url.origin + '/login.html'));
@@ -234,7 +236,13 @@ async function handle(request, env, ctx) {
   }
 
   const admin = !!(await loadUsers(env))[user]?.admin;
-  if (path === '/api/me') return json(200, { user, admin });
+  if (path === '/api/me') {
+    // 로그인 유지 중인 사용자가 접속하면 하루 이상 지난 뒤부터 30일로 다시 연장
+    const t = await readToken(env, getCookie(request, COOKIE));
+    const hdr = {};
+    if (t && t.rm && t.exp - Date.now() < SESSION_MS - 24 * 3600 * 1000) hdr['set-cookie'] = sessionCookie(await makeToken(env, user, true), SESSION_MS / 1000);
+    return json(200, { user, admin }, hdr);
+  }
 
   // ── 내 키워드 (계정별 저장: KV 키 kw:<아이디>) ──
   if (path === '/api/keywords') {

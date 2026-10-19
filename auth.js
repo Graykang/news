@@ -6,7 +6,8 @@ const path = require('path');
 const USERS_FILE = path.join(__dirname, 'users.json');
 const SECRET_FILE = path.join(__dirname, '.secret');
 const COOKIE = 'nm_session';
-const SESSION_MS = 30 * 24 * 3600 * 1000; // 로그인 30일 유지
+const SESSION_MS = 30 * 24 * 3600 * 1000; // '로그인 상태 유지' 선택 시 30일(사용할 때마다 연장)
+const SHORT_MS = 12 * 3600 * 1000; // 선택 안 하면 12시간, 브라우저를 닫으면 로그아웃
 
 // ───── 비밀번호 해시 (scrypt) ─────
 function hashPassword(pw) {
@@ -62,8 +63,8 @@ function getSecret() {
 const SECRET = getSecret();
 const sign = (data) => crypto.createHmac('sha256', SECRET).update(data).digest('base64url');
 
-function makeToken(user) {
-  const body = Buffer.from(JSON.stringify({ u: user, exp: Date.now() + SESSION_MS })).toString('base64url');
+function makeToken(user, remember = true) {
+  const body = Buffer.from(JSON.stringify({ u: user, exp: Date.now() + (remember ? SESSION_MS : SHORT_MS), rm: remember ? 1 : 0 })).toString('base64url');
   return `${body}.${sign(body)}`;
 }
 function readToken(token) {
@@ -72,9 +73,9 @@ function readToken(token) {
   const good = sign(body);
   if (sig.length !== good.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(good))) return null;
   try {
-    const { u, exp } = JSON.parse(Buffer.from(body, 'base64url').toString());
+    const { u, exp, rm } = JSON.parse(Buffer.from(body, 'base64url').toString());
     if (!u || exp < Date.now()) return null;
-    return u;
+    return { u, exp, rm: !!rm };
   } catch { return null; }
 }
 function parseCookies(req) {
@@ -86,15 +87,22 @@ function parseCookies(req) {
   return out;
 }
 function currentUser(req) {
-  const u = readToken(parseCookies(req)[COOKIE]);
-  return u && loadUsers()[u] ? u : null; // 계정을 삭제하면 바로 로그아웃 처리
+  const t = readToken(parseCookies(req)[COOKIE]);
+  return t && loadUsers()[t.u] ? t.u : null; // 계정을 삭제하면 바로 로그아웃 처리
+}
+// 로그인 유지 중인 사용자가 접속하면 하루 이상 지난 뒤부터 30일로 다시 연장
+function renewCookie(req) {
+  const t = readToken(parseCookies(req)[COOKIE]);
+  if (!t || !t.rm || t.exp - Date.now() > SESSION_MS - 24 * 3600 * 1000) return null;
+  return sessionCookie(req, makeToken(t.u, true), SESSION_MS / 1000);
 }
 function isAdmin(user) { const r = loadUsers()[user]; return !!(r && typeof r === 'object' && r.admin); }
 function isHttps(req) {
   return !!req.socket.encrypted || String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https';
 }
 function sessionCookie(req, token, maxAgeSec) {
-  return `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSec}${isHttps(req) ? '; Secure' : ''}`;
+  const age = maxAgeSec == null ? '' : `; Max-Age=${maxAgeSec}`; // null이면 브라우저를 닫을 때까지만 유지(세션 쿠키)
+  return `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax${age}${isHttps(req) ? '; Secure' : ''}`;
 }
 
 // ───── 로그인 시도 제한 (무차별 대입 방지) ─────
@@ -127,7 +135,7 @@ function recordFail(keys) {
 function clearFails(keys) { keys.forEach(k => fails.delete(k)); }
 setInterval(() => { const now = Date.now(); for (const [k, f] of fails) if (now - f.last > LOCK_MS && f.until < now) fails.delete(k); }, 3600e3).unref();
 
-function login(req, username, password) {
+function login(req, username, password, remember = true) {
   const id = String(username || '').trim().toLowerCase().slice(0, 40);
   const keys = ['ip:' + clientIp(req), 'u:' + id];
   const wait = lockedFor(keys);
@@ -137,8 +145,8 @@ function login(req, username, password) {
   const ok = verifyPassword(String(password || '').slice(0, 200), stored) && stored !== DUMMY;
   if (!ok) { recordFail(keys); return { ok: false, id, status: 401, error: '아이디 또는 비밀번호가 올바르지 않습니다.' }; }
   clearFails(keys);
-  return { ok: true, user: id, cookie: sessionCookie(req, makeToken(id), SESSION_MS / 1000) };
+  return { ok: true, user: id, cookie: sessionCookie(req, makeToken(id, remember), remember ? SESSION_MS / 1000 : null) };
 }
 function logoutCookie(req) { return sessionCookie(req, '', 0); }
 
-module.exports = { hashPassword, makeRecord, isAdmin, clientIp, fileUsers, loadUsers, saveUsers, currentUser, login, logoutCookie };
+module.exports = { hashPassword, makeRecord, isAdmin, clientIp, fileUsers, loadUsers, saveUsers, currentUser, renewCookie, login, logoutCookie };
