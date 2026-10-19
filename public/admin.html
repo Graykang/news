@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>관리자 · 뉴스 모아보기</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .adm h2 { font-size: 15px; margin: 28px 0 10px; }
+  .back { color: var(--accent); font-size: 14px; font-weight: 600; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 16px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .stat b { display: block; font-size: 24px; letter-spacing: -.03em; }
+  .stat span { font-size: 12.5px; color: var(--ink3); }
+  .tw { overflow-x: auto; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: top; }
+  th { font-size: 12px; color: var(--ink3); font-weight: 600; background: color-mix(in srgb, var(--line) 35%, transparent); }
+  tr:last-child td { border-bottom: 0; }
+  .badge { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 5px; background: var(--accent-soft); color: var(--accent); margin-left: 6px; }
+  .t-login { color: #15803d; } .t-visit { color: var(--ink2); } .t-fail { color: #b91c1c; font-weight: 700; }
+  .sub { color: var(--ink3); font-size: 12px; }
+  .ips summary { cursor: pointer; color: var(--accent); }
+  .ips div { color: var(--ink2); font-size: 12.5px; }
+  .flt { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .flt select { height: 34px; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 13px; }
+  .note { margin-top: 20px; color: var(--ink3); font-size: 12px; line-height: 1.7; }
+  .addf { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  .addf input[type=text], .addf input:not([type]) { height: 36px; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 13.5px; min-width: 200px; flex: 1; }
+  .chk { font-size: 13.5px; display: inline-flex; gap: 6px; align-items: center; }
+  .mini { height: 30px; padding: 0 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink2); border-radius: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .mini:hover { border-color: var(--accent); color: var(--accent); }
+  .mini.pri { background: var(--accent); border-color: var(--accent); color: #fff; height: 36px; padding: 0 16px; font-size: 13.5px; }
+  .mini.danger:hover { border-color: #b91c1c; color: #b91c1c; }
+  .cred { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; font-size: 14px; line-height: 1.8; }
+  .cred code { background: var(--card); padding: 1px 8px; border-radius: 6px; font-size: 14px; user-select: all; }
+  #amsg { margin: 8px 0 0; min-height: 18px; color: #b91c1c; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-row">
+    <div class="brand"><h1>관리자</h1><a class="back" href="/">← 뉴스로 돌아가기</a></div>
+    <div class="tools"><button class="icon-btn" id="reload" title="새로고침" aria-label="새로고침">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg></button></div>
+  </div>
+</header>
+<main class="wrap adm">
+  <div class="stats" id="stats"></div>
+
+  <h2>계정 관리</h2>
+  <div id="cred" class="cred" hidden></div>
+  <div class="tw"><table>
+    <thead><tr><th>아이디</th><th>권한</th><th>구분</th><th>관리</th></tr></thead>
+    <tbody id="accts"></tbody>
+  </table></div>
+  <form id="addf" class="addf">
+    <input id="nid" placeholder="새 아이디 (영문 소문자·숫자)" autocomplete="off" autocapitalize="none" required>
+    <input id="npw" placeholder="비밀번호 (비우면 자동 생성)" autocomplete="off">
+    <label class="chk"><input type="checkbox" id="nadm"> 관리자</label>
+    <button type="submit" class="mini pri">계정 추가</button>
+  </form>
+  <p class="sub" id="amsg" role="alert"></p>
+
+  <h2>계정별 접속 현황</h2>
+  <div class="tw"><table>
+    <thead><tr><th>아이디</th><th>접속 횟수</th><th>최근 접속</th><th>최근 IP</th><th>기기</th><th>사용한 IP</th><th>로그인 실패</th></tr></thead>
+    <tbody id="users"></tbody>
+  </table></div>
+
+  <h2>최근 활동</h2>
+  <div class="flt">
+    <select id="fu" aria-label="아이디"></select>
+    <select id="ft" aria-label="종류">
+      <option value="">전체 종류</option><option value="login">로그인</option><option value="visit">방문</option><option value="fail">로그인 실패</option>
+    </select>
+  </div>
+  <div class="tw"><table>
+    <thead><tr><th>시각</th><th>아이디</th><th>종류</th><th>IP</th><th>기기</th></tr></thead>
+    <tbody id="events"></tbody>
+  </table></div>
+  <button class="more" id="more" hidden>더 보기</button>
+
+  <p class="note">
+    · 접속 횟수는 로그인 + 30분 이상 간격의 방문을 센 값이고, 최근 활동은 최대 500건까지 보관됩니다.<br>
+    · 비밀번호와 읽은 기사는 기록하지 않습니다. 로그인 실패는 입력한 아이디만 남깁니다.<br>
+    · IP 주소는 가족 접속 확인용입니다. 외부에 공유하지 마세요.
+  </p>
+</main>
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const TYPE = { login: '로그인', visit: '방문', fail: '로그인 실패' };
+  const fmt = (t) => t ? new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '-';
+  function ago(t, now) {
+    if (!t) return '';
+    const m = Math.round((now - t) / 60000);
+    if (m < 1) return '방금';
+    if (m < 60) return m + '분 전';
+    const h = Math.floor(m / 60);
+    return h < 48 ? h + '시간 전' : Math.floor(h / 24) + '일 전';
+  }
+  let data = null, shown = 50;
+
+  function render() {
+    const now = data.now;
+    const day = now - 24 * 3600e3;
+    const dayStart = new Date(now); dayStart.setHours(0, 0, 0, 0);
+    const todayUsers = new Set(data.events.filter(e => e.t >= dayStart.getTime() && e.type !== 'fail').map(e => e.user));
+    const fails24 = data.events.filter(e => e.type === 'fail' && e.t >= day).length;
+    const total = Object.values(data.users).reduce((a, u) => a + (u.count || 0), 0);
+    $('#stats').innerHTML = [
+      [data.accounts.length, '등록된 계정'], [todayUsers.size, '오늘 접속한 사람'], [total, '누적 접속 횟수'], [fails24, '최근 24시간 로그인 실패'],
+    ].map(([n, l]) => `<div class="stat"><b>${n}</b><span>${l}</span></div>`).join('');
+
+    const ids = [...new Set([...data.accounts.map(a => a.id), ...Object.keys(data.users)])];
+    const isAdm = Object.fromEntries(data.accounts.map(a => [a.id, a.admin]));
+    $('#users').innerHTML = ids.map(id => {
+      const u = data.users[id] || { count: 0, ips: {}, fails: 0 };
+      const ips = Object.entries(u.ips || {}).sort((a, b) => b[1].last - a[1].last);
+      return `<tr>
+        <td><b>${esc(id)}</b>${isAdm[id] ? '<span class="badge">관리자</span>' : ''}${data.accounts.some(a => a.id === id) ? '' : '<span class="sub"> (삭제된 계정)</span>'}</td>
+        <td>${u.count || 0}회</td>
+        <td>${u.last ? esc(fmt(u.last)) + ' <span class="sub">' + esc(ago(u.last, now)) + '</span>' : '<span class="sub">접속 기록 없음</span>'}</td>
+        <td>${esc(u.lastIp || '-')}${u.lastCc ? ' <span class="sub">' + esc(u.lastCc) + '</span>' : ''}</td>
+        <td>${esc(u.lastUa || '-')}</td>
+        <td>${ips.length ? `<details class="ips"><summary>${ips.length}개</summary>${ips.map(([ip, v]) => `<div>${esc(ip)} · ${v.n}회 · ${esc(fmt(v.last))}</div>`).join('')}</details>` : '-'}</td>
+        <td>${u.fails ? `<span class="t-fail">${u.fails}회</span> <span class="sub">${esc(fmt(u.lastFail))}</span>` : '0'}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="7" class="sub">계정이 없습니다.</td></tr>';
+
+    const fu = $('#fu'), cur = fu.value;
+    fu.innerHTML = '<option value="">전체 아이디</option>' + [...new Set(data.events.map(e => e.user))].map(u => `<option>${esc(u)}</option>`).join('');
+    fu.value = cur;
+    renderEvents();
+  }
+  function renderEvents() {
+    const u = $('#fu').value, t = $('#ft').value;
+    const list = data.events.filter(e => (!u || e.user === u) && (!t || e.type === t));
+    $('#events').innerHTML = list.slice(0, shown).map(e =>
+      `<tr><td>${esc(fmt(e.t))} <span class="sub">${esc(ago(e.t, data.now))}</span></td><td>${esc(e.user)}</td><td class="t-${esc(e.type)}">${esc(TYPE[e.type] || e.type)}</td><td>${esc(e.ip)}${e.cc ? ' <span class="sub">' + esc(e.cc) + '</span>' : ''}</td><td>${esc(e.ua)}</td></tr>`
+    ).join('') || '<tr><td colspan="5" class="sub">기록이 없습니다.</td></tr>';
+    $('#more').hidden = list.length <= shown;
+  }
+  async function load() {
+    const r = await fetch('/api/admin/audit', { cache: 'no-store' });
+    if (r.status === 401) { location.href = '/login'; return; }
+    if (r.status === 403) { location.href = '/'; return; }
+    data = await r.json(); render();
+  }
+  // ── 계정 관리 ──
+  async function api(method, p, body) {
+    const r = await fetch(p, { method, headers: { 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' });
+    if (r.status === 401) { location.href = '/login'; return null; }
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || '요청에 실패했습니다.');
+    return j;
+  }
+  let accts = [], me = '';
+  async function loadAccts() {
+    const j = await api('GET', '/api/admin/accounts');
+    if (!j) return;
+    me = j.me; accts = j.accounts; renderAccts();
+  }
+  function renderAccts() {
+    $('#accts').innerHTML = accts.map(a => {
+      const fixed = a.source !== 'web', self = a.id === me;
+      const actions = fixed
+        ? '<span class="sub">처음 만든 관리자 · 웹에서 변경 불가</span>'
+        : `<button class="mini" data-act="pw" data-id="${esc(a.id)}">비밀번호 재설정</button>` + (self ? '' :
+          ` <button class="mini" data-act="adm" data-id="${esc(a.id)}" data-v="${a.admin ? 0 : 1}">${a.admin ? '관리자 해제' : '관리자 지정'}</button>` +
+          ` <button class="mini danger" data-act="del" data-id="${esc(a.id)}">삭제</button>`);
+      return `<tr><td><b>${esc(a.id)}</b>${self ? ' <span class="sub">(나)</span>' : ''}</td>
+        <td>${a.admin ? '<span class="badge" style="margin-left:0">관리자</span>' : '일반'}</td>
+        <td class="sub">${fixed ? '고정 계정' : '웹에서 추가'}</td><td>${actions}</td></tr>`;
+    }).join('') || '<tr><td colspan="4" class="sub">계정이 없습니다.</td></tr>';
+  }
+  function showCred(id, pw, title) {
+    const c = $('#cred'); c.hidden = false;
+    c.innerHTML = `<b>${esc(title)}</b><div>아이디 <code>${esc(id)}</code> · 비밀번호 <code>${esc(pw)}</code> <button class="mini" id="cp" type="button">복사</button></div><div class="sub">이 비밀번호는 지금 한 번만 보입니다. 가족에게 전달해 주세요.</div>`;
+    $('#cp').onclick = () => { try { navigator.clipboard.writeText(`아이디: ${id}\n비밀번호: ${pw}`).then(() => { $('#cp').textContent = '복사됨'; }); } catch {} };
+  }
+  async function act(fn) {
+    $('#amsg').textContent = '';
+    try { await fn(); await Promise.all([loadAccts(), load()]); } catch (e) { $('#amsg').textContent = e.message; }
+  }
+  $('#addf').addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    act(async () => {
+      const j = await api('POST', '/api/admin/accounts', { id: $('#nid').value, password: $('#npw').value, admin: $('#nadm').checked });
+      if (j) { showCred(j.id, j.password, '계정을 만들었습니다'); $('#nid').value = ''; $('#npw').value = ''; $('#nadm').checked = false; }
+    });
+  });
+  $('#accts').addEventListener('click', (ev) => {
+    const b = ev.target.closest('button[data-act]'); if (!b) return;
+    const id = b.dataset.id, kind = b.dataset.act;
+    if (kind === 'pw') {
+      if (!confirm(`'${id}'의 비밀번호를 새로 만들까요? 기존 비밀번호는 더 이상 쓸 수 없습니다.`)) return;
+      act(async () => { const j = await api('POST', '/api/admin/accounts/passwd', { id }); if (j) showCred(j.id, j.password, '비밀번호를 재설정했습니다'); });
+    } else if (kind === 'del') {
+      if (!confirm(`'${id}' 계정을 삭제할까요? 이 사람은 바로 로그아웃됩니다.`)) return;
+      act(async () => { await api('POST', '/api/admin/accounts/delete', { id }); });
+    } else if (kind === 'adm') {
+      act(async () => { await api('POST', '/api/admin/accounts/admin', { id, admin: b.dataset.v === '1' }); });
+    }
+  });
+  $('#reload').addEventListener('click', () => { load(); loadAccts().catch(() => {}); });
+  $('#more').addEventListener('click', () => { shown += 50; renderEvents(); });
+  $('#fu').addEventListener('change', () => { shown = 50; renderEvents(); });
+  $('#ft').addEventListener('change', () => { shown = 50; renderEvents(); });
+  try { const th = JSON.parse(localStorage.getItem('theme')); if (th) document.documentElement.dataset.theme = th; } catch {}
+  load(); loadAccts().catch(() => {});
+})();
+</script>
+</body>
+</html>

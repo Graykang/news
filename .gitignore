@@ -1,0 +1,8 @@
+node_modules
+.wrangler
+.dev.vars
+snapshot.json
+users.json
+.secret
+cache.json
+audit.json
