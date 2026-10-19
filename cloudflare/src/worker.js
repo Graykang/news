@@ -15,7 +15,8 @@ import { fetchTicker } from '../../lib/ticker.js';
 const COOKIE = 'nm_session';
 const SESSION_MS = 30 * 24 * 3600 * 1000; // '로그인 상태 유지' 선택 시 30일(사용할 때마다 연장)
 const SHORT_MS = 12 * 3600 * 1000; // 선택 안 하면 12시간, 브라우저를 닫으면 로그아웃
-const MAX_FAILS = 5;
+const MAX_FAILS = 5;       // 같은 아이디로 5번 틀리면 그 아이디만 15분 잠금
+const MAX_IP_FAILS = 30;   // 한 IP에서 여러 아이디를 돌려가며 시도하는 공격만 막는 넉넉한 기준(같은 집 가족은 영향 없음)
 const LOCK_SEC = 15 * 60;
 const enc = new TextEncoder();
 
@@ -109,7 +110,7 @@ async function lockedFor(env, keys) {
   try {
     for (const k of keys) {
       const f = await env.NEWS.get(k, 'json');
-      if (f && f.n >= MAX_FAILS) return true;
+      if (f && f.n >= (k.startsWith('f:ip:') ? MAX_IP_FAILS : MAX_FAILS)) return true;
     }
   } catch {}
   return false;

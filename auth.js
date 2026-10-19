@@ -106,7 +106,8 @@ function sessionCookie(req, token, maxAgeSec) {
 }
 
 // ───── 로그인 시도 제한 (무차별 대입 방지) ─────
-const MAX_FAILS = 5;
+const MAX_FAILS = 5;       // 같은 아이디로 5번 틀리면 그 아이디만 15분 잠금
+const MAX_IP_FAILS = 30;   // 한 IP에서 여러 아이디를 돌려가며 시도하는 공격만 막는 넉넉한 기준(같은 집 가족은 영향 없음)
 const LOCK_MS = 15 * 60 * 1000;
 const fails = new Map(); // key -> { n, until, last }
 function clientIp(req) {
@@ -128,7 +129,8 @@ function recordFail(keys) {
     const f = fails.get(k) || { n: 0, until: 0, last: 0 };
     if (now - f.last > LOCK_MS) f.n = 0;
     f.n++; f.last = now;
-    if (f.n >= MAX_FAILS) { f.until = now + LOCK_MS; f.n = 0; }
+    const limit = k.startsWith('ip:') ? MAX_IP_FAILS : MAX_FAILS;
+    if (f.n >= limit) { f.until = now + LOCK_MS; f.n = 0; }
     fails.set(k, f);
   }
 }
