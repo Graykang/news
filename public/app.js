@@ -39,6 +39,7 @@
   let query = '';
   let sub = store.get('opinionSub', 'ed'); // 사설·칼럼 탭: ed(사설) | col(칼럼·기고) | all
   let me = '';
+  let sortMode = store.get('sort', 'latest'); // latest(최신순) | hot(많이 다룬 순)
   let pending = null; // 새로 도착했지만 아직 반영하지 않은 데이터
 
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -117,7 +118,12 @@
         default: return c.cats.includes(tab);
       }
     });
+    if (sortMode === 'hot') list = list.filter(c => now - c.ts < 24 * 36e5).sort((a, b) => b.count - a.count || b.ts - a.ts); // 최근 24시간 중 여러 매체가 다룬 순
     return list.map(adjustForOutlets);
+  }
+  function renderSort() {
+    document.querySelectorAll('#sortbar .seg').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.sort === sortMode)));
+    $('#sorthint').textContent = sortMode === 'hot' ? '최근 24시간 · 여러 매체가 함께 보도한 순' : '';
   }
   // 신문사를 골라서 볼 때, 묶음의 대표 기사가 꺼 둔 신문사 것이면 켜 둔 신문사의 기사로 바꿔서 보여 줌
   function adjustForOutlets(c) {
@@ -187,6 +193,7 @@
   }
   function renderFeed() {
     const list = visible();
+    renderSort();
     const t = TABS.find(x => x.id === tab);
     if (tab === 'opinion') {
       const seg = [['ed', '사설'], ['col', '칼럼·기고'], ['all', '전체']];
@@ -202,7 +209,7 @@
     let html = '', lastDay = '';
     const slice = list.slice(0, shown);
     for (const c of slice) {
-      {
+      if (sortMode !== 'hot') {
         const dk = dayKey(c.ts);
         if (dk !== lastDay) { html += `<div class="day">${dayLabel(c.ts)}</div>`; lastDay = dk; }
       }
@@ -273,6 +280,10 @@
   $('#desc').addEventListener('click', (e) => {
     const b = e.target.closest('.seg'); if (!b) return;
     sub = b.dataset.sub; store.set('opinionSub', sub); shown = PAGE; renderFeed();
+  });
+  $('#sortbar').addEventListener('click', (e) => {
+    const b = e.target.closest('.seg'); if (!b) return;
+    sortMode = b.dataset.sort; store.set('sort', sortMode); shown = PAGE; renderFeed();
   });
   $('#more').addEventListener('click', () => { shown += PAGE; renderFeed(); });
   $('#newbar').addEventListener('click', () => { applyPending(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
