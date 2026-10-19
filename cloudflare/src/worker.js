@@ -12,6 +12,7 @@
 
 import { fetchTicker } from '../../lib/ticker.js';
 
+const cleanText = (s, max) => String(s || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max); // 줄바꿈·제어문자 제거 후 길이 제한
 const COOKIE = 'nm_session';
 const SESSION_MS = 30 * 24 * 3600 * 1000; // '로그인 상태 유지' 선택 시 30일(사용할 때마다 연장)
 const SHORT_MS = 12 * 3600 * 1000; // 선택 안 하면 12시간, 브라우저를 닫으면 로그아웃
@@ -271,7 +272,24 @@ async function handle(request, env, ctx) {
     const t = await readToken(env, getCookie(request, COOKIE));
     const hdr = {};
     if (t && t.rm && t.exp - Date.now() < SESSION_MS - 24 * 3600 * 1000) hdr['set-cookie'] = sessionCookie(await makeToken(env, user, true), SESSION_MS / 1000);
-    return json(200, { user, admin }, hdr);
+    const prof = (await env.NEWS.get('prof:' + user, 'json').catch(() => null)) || {};
+    return json(200, { user, admin, welcome: prof.welcome || '', motto: prof.motto || '' }, hdr);
+  }
+
+  // ── 내 프로필: 시작 화면에 보일 나만의 문구(좌우명·슬로건). 환영 메시지는 관리자가 계정 관리에서 입력 ──
+  if (path === '/api/me/profile' && request.method === 'PUT') {
+    if (!sameOrigin(request)) return json(403, { error: '허용되지 않은 요청입니다.' });
+    let body;
+    try {
+      const raw = await request.text();
+      if (raw.length > 2048) throw new Error('large');
+      body = JSON.parse(raw);
+    } catch { return json(400, { error: '잘못된 요청입니다.' }); }
+    const motto = cleanText(body.motto, 60);
+    const prof = (await env.NEWS.get('prof:' + user, 'json')) || {};
+    if (motto) prof.motto = motto; else delete prof.motto;
+    await env.NEWS.put('prof:' + user, JSON.stringify(prof));
+    return json(200, { ok: true, motto });
   }
 
   // ── 내 키워드 (계정별 저장: KV 키 kw:<아이디>) ──
@@ -334,8 +352,9 @@ async function handle(request, env, ctx) {
   if (path === '/api/admin/accounts' || path.startsWith('/api/admin/accounts/')) {
     if (!admin) return json(403, { error: 'forbidden' });
     const all = await loadUsers(env, true);
+    const profs = Object.fromEntries(await Promise.all(Object.keys(all).map(async (k) => [k, (await env.NEWS.get('prof:' + k, 'json').catch(() => null)) || {}])));
     const list = () => Object.entries(all)
-      .map(([id, v]) => ({ id, admin: v.admin, source: v.source, created: v.created }))
+      .map(([id, v]) => ({ id, admin: v.admin, source: v.source, created: v.created, welcome: (profs[id] || {}).welcome || '' }))
       .sort((a, b) => a.id.localeCompare(b.id));
     if (request.method === 'GET') return json(200, { me: user, accounts: list() });
     if (request.method !== 'POST' || !sameOrigin(request)) return json(403, { error: '허용되지 않은 요청입니다.' });
@@ -363,6 +382,13 @@ async function handle(request, env, ctx) {
     }
     const target = all[id];
     if (!target) return json(404, { error: '없는 아이디입니다.' });
+    if (sub === '/welcome') { // 환영 메시지는 고정 계정을 포함한 모든 계정에 설정 가능
+      const welcome = cleanText(body.welcome, 100);
+      const prof = (await env.NEWS.get('prof:' + id, 'json')) || {};
+      if (welcome) prof.welcome = welcome; else delete prof.welcome;
+      await env.NEWS.put('prof:' + id, JSON.stringify(prof));
+      return json(200, { ok: true, welcome });
+    }
     if (target.source !== 'web') return json(400, { error: '고정 계정(처음 만든 관리자)은 웹에서 바꿀 수 없습니다.' });
     if (!web[id]) return json(404, { error: '없는 아이디입니다.' });
 
@@ -377,7 +403,7 @@ async function handle(request, env, ctx) {
       if (id === user) return json(400, { error: '자기 자신은 삭제할 수 없습니다.' });
       delete web[id];
       await save();
-      try { await env.NEWS.delete('kw:' + id); } catch {}
+      try { await env.NEWS.delete('kw:' + id); await env.NEWS.delete('prof:' + id); } catch {}
       return json(200, { ok: true });
     }
     if (sub === '/admin') {

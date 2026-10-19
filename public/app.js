@@ -39,6 +39,7 @@
   let query = '';
   let sub = store.get('opinionSub', 'ed'); // 사설·칼럼 탭: ed(사설) | col(칼럼·기고) | all
   let me = '';
+  let appReady = false; // 첫 기사 목록이 그려졌는지(시작 화면이 사라지는 시점 판단용)
   let sortMode = store.get('sort', 'latest'); // latest(최신순) | hot(많이 다룬 순)
   let pending = null; // 새로 도착했지만 아직 반영하지 않은 데이터
 
@@ -227,7 +228,7 @@
     const bad = [...new Set(data.feedStatus.filter(f => !f.ok).map(f => data.outlets[f.outlet].name))];
     $('#feedwarn').innerHTML = bad.length ? `<span class="warn">일시적으로 가져오지 못한 매체: ${esc(bad.join(', '))}</span>` : '';
   }
-  function renderAll() { renderMeta(); renderTabs(); renderOutlets(); renderFeed(); }
+  function renderAll() { appReady = true; renderMeta(); renderTabs(); renderOutlets(); renderFeed(); }
 
   // ── 데이터 ──
   async function load(first) {
@@ -347,6 +348,74 @@
     } catch {}
   }
 
+  // ── 시작 화면(하루 첫 접속 때 한 번) · 내 설정 ──
+  let profile = { welcome: '', motto: '' };
+  const splashEl = $('#splash');
+  const splashOn = document.documentElement.classList.contains('splash-on'); // 오늘 아직 안 봤을 때만 켜짐(head의 짧은 스크립트가 판단)
+  let splashT0 = performance.now(), splashMin = 1300, splashFilled = false, splashDone = false;
+  function greeting() {
+    const h = new Date().getHours();
+    return h < 5 ? '편안한 밤 되세요' : h < 11 ? '좋은 아침입니다' : h < 14 ? '즐거운 점심시간입니다' : h < 18 ? '좋은 오후입니다' : h < 22 ? '좋은 저녁입니다' : '편안한 밤 되세요';
+  }
+  function endSplash() {
+    if (splashDone) return;
+    splashDone = true;
+    splashEl.classList.add('sp-out');
+    setTimeout(() => document.documentElement.classList.remove('splash-on'), 480);
+    try {
+      const d = new Date();
+      localStorage.setItem('splashDay', `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`);
+      sessionStorage.removeItem('justLoggedIn');
+    } catch {}
+  }
+  function fillSplash(j) {
+    profile = { welcome: j.welcome || '', motto: j.motto || '' };
+    if (!splashOn) return;
+    let manual = false;
+    try { manual = sessionStorage.getItem('justLoggedIn') === '1'; } catch {}
+    $('#spHello').textContent = `${j.user}님, ${greeting()}`;
+    $('#spMsg').textContent = profile.welcome;
+    $('#spMotto').textContent = profile.motto ? `“${profile.motto}”` : '';
+    $('#spAuto').textContent = manual ? '로그인되었습니다' : '자동 로그인되었습니다';
+    splashMin = (profile.welcome || profile.motto) ? 2300 : 1300; // 문구가 있으면 읽을 시간을 조금 더
+    splashT0 = performance.now();
+    splashFilled = true;
+    splashEl.classList.add('sp-ready');
+  }
+  if (splashOn) {
+    splashEl.addEventListener('click', endSplash);          // 화면을 누르면 바로 건너뜀
+    document.addEventListener('keydown', endSplash, { once: true });
+    const bootT0 = performance.now();
+    const tick = setInterval(() => {
+      const now = performance.now();
+      // 문구를 보여 준 뒤 최소 시간이 지나고 기사 목록도 준비됐을 때 사라짐(기다리게 하지 않음). 무슨 일이 있어도 4.5초면 종료
+      if ((splashFilled && now - splashT0 >= splashMin && appReady) || now - bootT0 > 4500) { clearInterval(tick); endSplash(); }
+    }, 100);
+  }
+
+  const dlg = $('#prof');
+  $('#settings').addEventListener('click', () => {
+    let off = false;
+    try { off = localStorage.getItem('splashOff') === '1'; } catch {}
+    $('#pfSplash').checked = !off;
+    $('#pfMotto').value = profile.motto || '';
+    $('#pfWelcome').textContent = profile.welcome ? `관리자가 남긴 메시지: ${profile.welcome}` : '';
+    $('#pfMsg').textContent = '';
+    dlg.showModal();
+  });
+  $('#pfClose').addEventListener('click', () => dlg.close());
+  $('#pfSave').addEventListener('click', async () => {
+    try { localStorage.setItem('splashOff', $('#pfSplash').checked ? '0' : '1'); } catch {}
+    try {
+      const r = await fetch('/api/me/profile', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ motto: $('#pfMotto').value }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || '저장하지 못했습니다.');
+      profile.motto = j.motto || '';
+      $('#pfMsg').textContent = '저장했습니다.';
+      setTimeout(() => dlg.close(), 700);
+    } catch (e) { $('#pfMsg').textContent = e.message; }
+  });
+
   // 테마
   const root = document.documentElement;
   const savedTheme = store.get('theme', null);
@@ -377,7 +446,7 @@
 
   $('#feed').innerHTML = '<div class="sk"></div>'.repeat(5);
   $('#today').textContent = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
-  fetch('/api/me').then(r => r.json()).then(j => { me = j.user || ''; $('#whoname').textContent = me; $('#adminlink').hidden = !j.admin; }).catch(() => {});
+  fetch('/api/me').then(r => r.json()).then(j => { me = j.user || ''; $('#whoname').textContent = me; $('#adminlink').hidden = !j.admin; fillSplash(j); }).catch(() => {});
   fetch('/api/keywords').then(r => r.json()).then(j => {
     kw = { include: j.include || [], exclude: j.exclude || [] };
     if (data) { renderTabs(); renderFeed(); }

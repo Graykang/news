@@ -52,7 +52,7 @@
   <h2>계정 관리</h2>
   <div id="cred" class="cred" hidden></div>
   <div class="tw"><table>
-    <thead><tr><th>아이디</th><th>권한</th><th>구분</th><th>관리</th></tr></thead>
+    <thead><tr><th>아이디</th><th>권한</th><th>구분</th><th>환영 메시지(시작 화면)</th><th>관리</th></tr></thead>
     <tbody id="accts"></tbody>
   </table></div>
   <form id="addf" class="addf">
@@ -175,10 +175,11 @@
         : `<button class="mini" data-act="pw" data-id="${esc(a.id)}">비밀번호 재설정</button>` + (self ? '' :
           ` <button class="mini" data-act="adm" data-id="${esc(a.id)}" data-v="${a.admin ? 0 : 1}">${a.admin ? '관리자 해제' : '관리자 지정'}</button>` +
           ` <button class="mini danger" data-act="del" data-id="${esc(a.id)}">삭제</button>`);
+      const welcomeCell = `${a.welcome ? esc(a.welcome) : '<span class="sub">(없음)</span>'} <button class="mini" data-act="wel" data-id="${esc(a.id)}" data-v="${esc(a.welcome || '')}">편집</button>`;
       return `<tr><td><b>${esc(a.id)}</b>${self ? ' <span class="sub">(나)</span>' : ''}</td>
         <td>${a.admin ? '<span class="badge" style="margin-left:0">관리자</span>' : '일반'}</td>
-        <td class="sub">${fixed ? '고정 계정' : '웹에서 추가'}</td><td>${actions}</td></tr>`;
-    }).join('') || '<tr><td colspan="4" class="sub">계정이 없습니다.</td></tr>';
+        <td class="sub">${fixed ? '고정 계정' : '웹에서 추가'}</td><td style="white-space:normal;max-width:260px">${welcomeCell}</td><td>${actions}</td></tr>`;
+    }).join('') || '<tr><td colspan="5" class="sub">계정이 없습니다.</td></tr>';
   }
   function showCred(id, pw, title) {
     const c = $('#cred'); c.hidden = false;
@@ -205,6 +206,10 @@
     } else if (kind === 'del') {
       if (!confirm(`'${id}' 계정을 삭제할까요? 이 사람은 바로 로그아웃됩니다.`)) return;
       act(async () => { await api('POST', '/api/admin/accounts/delete', { id }); });
+    } else if (kind === 'wel') {
+      const v = prompt(`'${id}'에게만 시작 화면에 보여 줄 환영 메시지를 적어 주세요. (최대 100자, 비우면 삭제)`, b.dataset.v || '');
+      if (v === null) return;
+      act(async () => { await api('POST', '/api/admin/accounts/welcome', { id, welcome: v }); });
     } else if (kind === 'adm') {
       act(async () => { await api('POST', '/api/admin/accounts/admin', { id, admin: b.dataset.v === '1' }); });
     }

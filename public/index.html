@@ -8,9 +8,37 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex,nofollow,noarchive">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231d4ed8'/%3E%3Cpath d='M8 10h16M8 16h16M8 22h10' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>
+  // 하루 첫 접속 때만 시작 화면을 켬(깜빡임 없이 바로 덮기 위해 가장 먼저 판단). 각자 '내 설정'에서 끌 수 있음
+  try {
+    var d = new Date(), k = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+    var off = localStorage.getItem('splashOff') === '1', just = sessionStorage.getItem('justLoggedIn') === '1';
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches && !off && (just || localStorage.getItem('splashDay') !== k)) document.documentElement.classList.add('splash-on');
+  } catch (e) {}
+</script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="splash" aria-hidden="true">
+  <div class="sp-card">
+    <h1 class="sp-title">Kangs News</h1>
+    <p class="sp-hello" id="spHello"></p>
+    <p class="sp-msg" id="spMsg"></p>
+    <p class="sp-motto" id="spMotto"></p>
+    <p class="sp-auto" id="spAuto">자동 로그인 중…</p>
+  </div>
+</div>
+
+<dialog id="prof" class="prof">
+  <h3>내 설정</h3>
+  <label class="pf"><input type="checkbox" id="pfSplash"> 하루 첫 접속 때 시작 화면 보기</label>
+  <label class="pf2" for="pfMotto">나의 문구 (좌우명·슬로건, 최대 60자)</label>
+  <input id="pfMotto" maxlength="60" placeholder="시작 화면에 내 이름과 함께 보일 문구" autocomplete="off">
+  <p class="pfhint" id="pfWelcome"></p>
+  <div class="pfbtns"><button id="pfSave" type="button">저장</button><button id="pfClose" type="button" class="ghost">닫기</button></div>
+  <p class="pfmsg" id="pfMsg" role="status"></p>
+</dialog>
+
 <header class="top">
   <div class="ticker" id="ticker" hidden aria-label="환율·지수 시세"><div class="ticker-track" id="tickerTrack"></div></div>
   <div class="wrap top-row">
@@ -20,6 +48,7 @@
     </div>
     <div class="tools">
       <span class="updated" id="updated"></span>
+      <button class="who" id="settings" title="내 설정">설정</button>
       <a class="who" id="adminlink" href="/admin" hidden>관리</a>
       <button class="who" id="logout" title="로그아웃"><span id="whoname"></span> 로그아웃</button>
       <button class="icon-btn" id="refresh" title="지금 새로고침" aria-label="새로고침">

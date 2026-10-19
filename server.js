@@ -11,6 +11,11 @@ const audit = require('./audit');
 const collect = require('./lib/collect');
 const ticker = require('./lib/ticker');
 let tk = { at: 0, data: null }; // 시세 자막 1분 캐시
+const PF = path.join(__dirname, 'profiles.json'); // 계정별 환영 메시지·나만의 문구
+const readProf = () => { try { return JSON.parse(fs.readFileSync(PF, 'utf8')); } catch { return {}; } };
+const writeProf = (o) => { try { fs.writeFileSync(PF, JSON.stringify(o)); } catch {} };
+const cleanText = (s, max) => String(s || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max); // 줄바꿈·제어문자 제거 후 길이 제한
+
 const { OUTLETS, CATEGORIES, refresh, REFRESH_MS } = collect;
 
 const PORT = process.env.PORT || 3100;
@@ -95,7 +100,19 @@ const server = http.createServer(async (req, res) => {
   }
 
   const admin = auth.isAdmin(user);
-  if (url.pathname === '/api/me') { const renew = auth.renewCookie(req); return sendJson(res, 200, { user, admin }, renew ? { 'set-cookie': renew } : {}); }
+  if (url.pathname === '/api/me') { const renew = auth.renewCookie(req); const p = readProf()[user] || {}; return sendJson(res, 200, { user, admin, welcome: p.welcome || '', motto: p.motto || '' }, renew ? { 'set-cookie': renew } : {}); }
+
+  // ── 내 프로필: 시작 화면에 보일 나만의 문구(좌우명·슬로건). 환영 메시지는 관리자가 계정 관리에서 입력 ──
+  if (url.pathname === '/api/me/profile' && req.method === 'PUT') {
+    if (!sameOrigin(req)) return sendJson(res, 403, { error: '허용되지 않은 요청입니다.' });
+    let body;
+    try { body = JSON.parse(await readBody(req, 2048)); } catch { return sendJson(res, 400, { error: '잘못된 요청입니다.' }); }
+    const motto = cleanText(body.motto, 60);
+    const all = readProf(); const p = all[user] || {};
+    if (motto) p.motto = motto; else delete p.motto;
+    all[user] = p; writeProf(all);
+    return sendJson(res, 200, { ok: true, motto });
+  }
 
   // ── 내 키워드 (계정별 저장: keywords.json) ──
   if (url.pathname === '/api/keywords') {
@@ -148,7 +165,7 @@ const server = http.createServer(async (req, res) => {
     let fixed = [];
     try { fixed = Object.keys(JSON.parse(process.env.FAMILY_USERS || '{}')); } catch {}
     const list = () => Object.entries(auth.loadUsers())
-      .map(([id, v]) => ({ id, admin: !!(v && v.admin), source: fixed.includes(id) ? 'secret' : 'web', created: (v && v.created) || 0 }))
+      .map(([id, v]) => ({ id, admin: !!(v && v.admin), source: fixed.includes(id) ? 'secret' : 'web', created: (v && v.created) || 0, welcome: (readProf()[id] || {}).welcome || '' }))
       .sort((a, b) => a.id.localeCompare(b.id));
     if (req.method === 'GET') return sendJson(res, 200, { me: user, accounts: list() });
     if (req.method !== 'POST' || !sameOrigin(req)) return sendJson(res, 403, { error: '허용되지 않은 요청입니다.' });
@@ -173,6 +190,13 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { ok: true, id, password: pw });
     }
     if (!auth.loadUsers()[id]) return sendJson(res, 404, { error: '없는 아이디입니다.' });
+    if (sub === '/welcome') { // 환영 메시지는 고정 계정을 포함한 모든 계정에 설정 가능
+      const welcome = cleanText(body.welcome, 100);
+      const all = readProf(); const p = all[id] || {};
+      if (welcome) p.welcome = welcome; else delete p.welcome;
+      all[id] = p; writeProf(all);
+      return sendJson(res, 200, { ok: true, welcome });
+    }
     if (fixed.includes(id) || !file[id]) return sendJson(res, 400, { error: '고정 계정은 웹에서 바꿀 수 없습니다.' });
 
     if (sub === '/passwd') {
@@ -186,6 +210,7 @@ const server = http.createServer(async (req, res) => {
       if (id === user) return sendJson(res, 400, { error: '자기 자신은 삭제할 수 없습니다.' });
       delete file[id];
       auth.saveUsers(file);
+      { const pf = readProf(); delete pf[id]; writeProf(pf); }
       return sendJson(res, 200, { ok: true });
     }
     if (sub === '/admin') {
