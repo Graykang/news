@@ -1,0 +1,16 @@
+{
+  "name": "Kangs News · 뉴스 모아보기",
+  "short_name": "Kangs News",
+  "description": "광고 없이 헤드라인 뉴스와 사설만 모아보는 가족용 뉴스 리더",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#12382b",
+  "theme_color": "#12382b",
+  "lang": "ko",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

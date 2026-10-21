@@ -82,6 +82,19 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 200, { ok: true }, { 'set-cookie': auth.logoutCookie(req) });
   }
 
+  // 아이콘·앱 설정 파일(로그인 전에도 공개, 하루 캐시)
+  if (url.pathname.startsWith('/icons/') || url.pathname === '/manifest.webmanifest' || url.pathname === '/favicon.ico') {
+    const rel = url.pathname === '/favicon.ico' ? '/icons/favicon-32.png' : url.pathname;
+    const file = path.normalize(path.join(PUBLIC_DIR, rel));
+    if (!file.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end(); }
+    const types = { '.svg': 'image/svg+xml', '.png': 'image/png', '.webmanifest': 'application/manifest+json; charset=utf-8' };
+    return fs.readFile(file, (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Not found'); }
+      res.writeHead(200, { 'content-type': types[path.extname(file)] || 'application/octet-stream', 'cache-control': 'public, max-age=86400' });
+      res.end(data);
+    });
+  }
+
   // 로그인 화면 배경 사진(이 두 파일만 로그인 전에도 공개, 하루 캐시)
   if (url.pathname === '/img/login-bg.jpg' || url.pathname === '/img/login-bg-m.jpg') {
     return fs.readFile(path.join(PUBLIC_DIR, url.pathname), (err, data) => {

@@ -259,6 +259,15 @@ async function handle(request, env, ctx) {
     return out;
   }
 
+  // 아이콘·앱 설정 파일(로그인 화면의 탭 아이콘에도 쓰이므로 공개, 하루 캐시)
+  if (path.startsWith('/icons/') || path === '/manifest.webmanifest' || path === '/favicon.ico') {
+    const asset = await env.ASSETS.fetch(path === '/favicon.ico' ? new Request(new URL('/icons/favicon-32.png', request.url), request) : request);
+    const out = new Response(asset.body, asset);
+    out.headers.set('cache-control', 'public, max-age=86400');
+    if (path === '/manifest.webmanifest') out.headers.set('content-type', 'application/manifest+json; charset=utf-8');
+    return out;
+  }
+
   // ── 이하 로그인 필요 ──
   const user = await currentUser(request, env);
   if (!user) {
